@@ -1,0 +1,86 @@
+{
+  "_doc": "Known safety-filter triggers for video/image generation and the staging rewrite that preserves the beat. symptom: 'block' = explicit safety error; 'silent' = completed with no output. Add a row every time you solve a new one.",
+  "rules": [
+    {
+      "id": "ledge-drop",
+      "pattern": "(outer|narrow)?\\s*ledge.*(drop|feet|storeys|stories|below)|stand(s|ing)? on the (edge|ledge|parapet) of (a|the) (roof|skyscraper|building)",
+      "symptom": "block",
+      "why": "reads as self-harm / dangerous act",
+      "rewrite": "Keep the height and the drop in frame, move the subject BEHIND a low parapet or onto the roof deck; let gravel/pebbles go over the edge instead of the person being on it.",
+      "example_before": "his foot slips on the outer ledge, pebbles fall hundreds of feet",
+      "example_after": "his foot skids on loose gravel behind the low parapet; pebbles skitter through a gap and tumble toward the city far below"
+    },
+    {
+      "id": "scar",
+      "pattern": "\\bscar(s|red)?\\b",
+      "symptom": "silent",
+      "why": "injury depiction on a character sheet",
+      "rewrite": "Describe as 'a small pale notch/healed mark through the left eyebrow'. Prefer adding via an image EDIT pass on a clean sheet rather than in the base prompt.",
+      "example_before": "a scar over his left eyebrow as his signature detail",
+      "example_after": "a small pale notch mark through his left eyebrow as his signature detail"
+    },
+    {
+      "id": "greedy-named-villain",
+      "pattern": "(named [A-Z][a-z]+|\\b[A-Z][a-z]{2,},? an? )[^.]{0,40}\\b(greedy|cruel|evil|wicked|sadistic|arrogant)\\b",
+      "symptom": "silent",
+      "why": "negative trait attached to a proper name",
+      "rewrite": "Drop the name from the image prompt (names aren't visual) and keep only visual trait words: 'proud, haughty expression'.",
+      "example_before": "Kesar, a proud, greedy lion",
+      "example_after": "a proud, haughty lion"
+    },
+    {
+      "id": "weapon-raised",
+      "pattern": "(baton|stick|bat|knife|gun|pistol|rifle).*(raised|swing|aim|point(ed|ing)? at)",
+      "symptom": "block",
+      "why": "imminent violence",
+      "rewrite": "Replace with 'pointing and shouting', 'charging across the roof', 'towers over him'. Keep dust, speed, and the actor's fear.",
+      "example_before": "the guard charges, baton raised",
+      "example_after": "the guard charges across the roof deck, pointing and yelling, dust kicking up behind him"
+    },
+    {
+      "id": "gore",
+      "pattern": "\\b(blood|bleed|gore|gory|wound)\\b",
+      "symptom": "block",
+      "why": "graphic injury",
+      "rewrite": "Remove; for kids'/storybook content add 'not gory, no blood, storybook-friendly' (this phrase itself is safe).",
+      "example_before": "blood on his face",
+      "example_after": "dust and a bruise-coloured shadow on his cheek"
+    },
+    {
+      "id": "named-artist",
+      "pattern": "\\b(Reznor|Zimmer|Levi|Nolan|Fincher|Tarantino|Kubrick|Spielberg)\\b",
+      "symptom": "block",
+      "why": "music/image models refuse real artist names (prohibited_content)",
+      "rewrite": "Describe the sound/look instead: 'industrial pulse, bowed-metal clusters, sparse sub-bass'.",
+      "example_before": "Trent Reznor, Gone Girl texture",
+      "example_after": "cold minimal industrial electronic texture, distorted 808, thin high sine"
+    },
+    {
+      "id": "real-person",
+      "pattern": "\\b(celebrity|actor|actress) [A-Z][a-z]+ [A-Z][a-z]+\\b",
+      "symptom": "block",
+      "why": "likeness of a real person",
+      "rewrite": "Describe the archetype, never the person.",
+      "example_before": "looks like <real actor>",
+      "example_after": "a wiry man in his forties with a salt-and-pepper beard"
+    },
+    {
+      "id": "minor-peril",
+      "pattern": "\\b(child|kid|boy|girl|teen)\\b.*\\b(ledge|roof edge|drown|knife|gun|fire)\\b",
+      "symptom": "block",
+      "why": "minors in danger",
+      "rewrite": "Age the character up ('young man') or remove the hazard from frame; keep the emotional beat.",
+      "example_before": "the boy on the ledge",
+      "example_after": "the young man at the parapet"
+    },
+    {
+      "id": "speech-extend",
+      "pattern": "__task:extend__.*dialogue",
+      "symptom": "block",
+      "why": "extend task refuses speech edits",
+      "rewrite": "Use reference_to_video anchored on the previous part's last frame instead of extend.",
+      "example_before": "extend with the caller continuing",
+      "example_after": "reference_to_video, image=part1_last.png, 'exact continuation of the reference image'"
+    }
+  ]
+}

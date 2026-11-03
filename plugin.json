@@ -1,0 +1,13 @@
+{
+  "name": "ai-studio-crew",
+  "displayName": "AI Studio Crew",
+  "version": "0.1.0",
+  "description": "Your AI film crew, living in Antigravity. Brief the 1st AD; they call the right crew (Casting, DOP, Camera, Voice, Editor, Sound, Composer, Mixer, Colorist, Post) and the right tools, run dailies, and bring you the cut. Built for micro-drama and short-form episodic production.",
+  "author": { "name": "Girish Nair" },
+  "logo": "assets/logo.svg",
+  "suggestedPrompts": [
+    "Start a new production called 'Like Follow Die or Kill' and cast the lead from these references",
+    "Episode 1, scene 4: Rishi gets the call. Dark, tense, under 30 seconds. Bring me dailies.",
+    "Get me the editor — tighten the title reveal and deliver an OTIO for Resolve"
+  ]
+}
