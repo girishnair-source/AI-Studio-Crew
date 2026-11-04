@@ -9,44 +9,22 @@ and brings you the cut. You pick the take.
 
 ---
 
-## 0. Publish it first (one time, for Girish)
-
-The plugin is committed locally and pointed at GitHub, but the cloudtop has no
-GitHub credentials, so the push is yours. Either:
-
-**From the cloudtop** (after adding a GitHub token or SSH key):
-```bash
-cd ~/.gemini/config/plugins/ai-studio-crew
-# create the empty repo "AI-Studio-Crew" on github.com/girishnair-source first, then:
-git push -u origin main
-```
-
-**Or from your Mac** — download the zip, then:
-```bash
-unzip AI-Studio-Crew-v0.1.zip && cd ai-studio-crew
-git init && git add -A && git commit -m "AI Studio Crew v0.1"
-git remote add origin https://github.com/girishnair-source/AI-Studio-Crew.git
-git branch -M main && git push -u origin main
-```
-Zip: https://drive.google.com/file/d/1eC6B94yNUSuXP_TmBw0WfhovX7Npyx6T/view
-
----
-
 ## 1. Hire the crew (10 minutes, once)
 
-Think of this as the crew moving into the studio.
+Think of this as the crew moving into the studio. You don't install anything
+by hand — you ask Antigravity to bring the crew in.
 
-1. **Get the crew files.**
-   `git clone https://github.com/girishnair-source/AI-Studio-Crew.git ~/.gemini/config/plugins/ai-studio-crew`
-   (or unzip the download into that same folder).
-2. **Restart Antigravity.** When it comes back, the crew is on the lot.
-3. **Check the lot has power.** Open Antigravity and say:
-   > "1st AD, run a tech check."
-   The AD runs the studio's `doctor` and tells you in plain words whether the
-   cameras (video model) are reachable and whether you're signed in. If it
-   says you're not signed in, it will tell you the one thing to do (usually:
-   sign in to your Google Cloud account).
-4. **Pick the 1st AD as your main agent** in the agent picker. From now on,
+1. **Install Antigravity** and sign in with your Google Cloud account.
+2. **Open a new chat and paste this:**
+
+   > Bring in my film crew. Clone **https://github.com/girishnair-source/AI-Studio-Crew.git**
+   > into my Antigravity plugins folder as `ai-studio-crew`, enable the plugin,
+   > run its tech check, and tell me when the 1st AD is ready to take a brief.
+
+   Antigravity clones the repo, switches the plugin on, runs the studio's
+   `doctor` (are the cameras reachable? am I signed in?) and reports back in
+   plain words. If it asks you to restart, restart.
+3. **Pick the 1st AD as your main agent** in the agent picker. From now on,
    every conversation starts with the AD.
 
 That's it. You never install or configure the individual crew members.
