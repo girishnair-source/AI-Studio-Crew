@@ -118,6 +118,25 @@ kept; nothing is overwritten.
 
 ---
 
+## 5a. Autopilot — hand over the whole script
+
+You don't have to work scene by scene. Give the AD the entire script and say:
+
+> *"Here's Episode 1. Run it on autopilot and bring me the master."*
+
+The AD breaks the script into scenes, does pre-production once (casting,
+voices), shoots every scene in order, picks the takes itself, cuts, scores,
+mixes and delivers the episode — with a log of every decision it made and why.
+It will only stop to ask you if a beat can't be staged within the studio's
+rules, a line won't fit without changing your script, the budget cap is hit,
+or a reference is missing.
+
+**Tip:** try it on a 2–3 scene script first. A ~90-second episode takes
+roughly 30–60 minutes unattended. Prefer to approve things yourself? Say
+*"director's cut"* (every shot) or *"dailies"* (every scene).
+
+---
+
 ## 6. Things that will happen (and what they mean)
 
 | You see | It means | What to do |
