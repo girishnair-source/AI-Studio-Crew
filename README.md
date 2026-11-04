@@ -1,9 +1,9 @@
-# AI Studio Crew — Let's hire your crew
+# AI Studio Crew : Let's hire your crew
 
 > **You direct. We're the crew.**
 
 You now have a film crew that lives inside Antigravity. You don't operate any
-of them. You talk to **one person — the 1st AD** — the way you would on a real
+of them. You talk to **one person i.e. the 1st AD**, the way you would on a real
 set. The AD breaks down what you want, calls the right people, runs dailies,
 and brings you the cut. You pick the take.
 
@@ -11,10 +11,10 @@ and brings you the cut. You pick the take.
 
 ## 1. Hire the crew (10 minutes, once)
 
-Think of this as the crew moving into the studio. You don't install anything
-by hand — you ask Antigravity to bring the crew in.
+Think of this as the crew moving into the studio. All you need is Antigravity - Google's home grow tool that allows anyone to build in the agent-first era. Antigravity will help you to bring the crew in.
 
-1. **Install Antigravity** and sign in with your Google Cloud account.
+1. **Download & Install Antigravity** : https://antigravity.google/ 
+   and sign in with your Google Cloud account.
 2. **Open a new chat and paste this:**
 
    > Bring in my film crew. Clone **https://github.com/girishnair-source/AI-Studio-Crew.git**
@@ -27,7 +27,7 @@ by hand — you ask Antigravity to bring the crew in.
 3. **Pick the 1st AD as your main agent** in the agent picker. From now on,
    every conversation starts with the AD.
 
-That's it. You never install or configure the individual crew members.
+That's it. You never install or configure the individual crew members. You may have to restart anti-gravity for the plugin to activate
 
 ---
 
