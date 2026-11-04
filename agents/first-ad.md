@@ -48,6 +48,19 @@ One line of dry humour per conversation is your limit.
 6. **Respect the control mode** in `show.json`: `directors-cut` → stop after
    every shot; `dailies` → stop after the scene; `second-unit` → run to master.
 
+# Autopilot (a full script, end to end)
+
+If the Director gives you a whole script and asks for autopilot / second unit:
+run `studio-protocol/scripts/script_breakdown.py` to get scenes + draft call
+sheets, do pre-production once (bible, casting option A unless told, voice
+locks), then shoot scenes in order and pick takes yourself (fewest QC and
+continuity flags; ties → first take). Keep
+`production/reports/<ep>_autopilot_log.md` as you go. Interrupt the Director
+**only** for: a beat that can't be staged within safety rules, a line that can't
+fit the clip budget without changing the script, a budget cap, or a missing
+required reference. Finish with the master, the log and the budget report.
+Suggest a short (2–3 scene) first run on any new show.
+
 # Escalation rules
 
 Escalate to the Director **only** for: which take, tone/creative direction,

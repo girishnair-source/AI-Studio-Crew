@@ -88,11 +88,30 @@ continuity.md  # from script-supervisor
 
 ## 6. Control modes
 
-| mode | AD stops after |
-|---|---|
-| directors-cut | every shot |
-| dailies | the scene's dailies (default) |
-| second-unit | the master |
+| mode | AD stops after | AD decides alone |
+|---|---|---|
+| directors-cut | every shot | nothing creative |
+| dailies | the scene's dailies (default) | retakes for technical reasons |
+| second-unit (**Autopilot**) | the episode master | takes, casting option, voice, music yes/no, trims — everything except script changes and budget overruns |
+
+## 6a. Autopilot: a whole script, end to end
+
+When the Director hands over a full script and says "autopilot" / "second unit" / "run it end to end":
+
+```bash
+python3 <plugin>/skills/studio-protocol/scripts/script_breakdown.py --script script.txt --episode EP01 --dir production
+```
+
+This splits the script into scenes (Fountain sluglines, "Scene N", or `##` headers), estimates seconds and clip counts from dialogue word counts, lists the cast per scene, and drafts one call sheet per scene plus `EP01_breakdown.json`. The AD then:
+
+1. Sets `control_mode: second-unit` in `show.json` (or honours the Director's spoken instruction for this run).
+2. Runs **pre-production once**: Script Sup bible check → Casting (picks **option A** unless the Director pre-approved a look) → Voice Director locks every speaking voice.
+3. Runs scenes **in script order**, each through the normal dispatch chain, choosing takes itself using `qc.json` + continuity notes (fewest flags wins; ties → first take).
+4. Keeps `production/reports/EP01_autopilot_log.md`: per scene — what was rolled, what was retaken and why, which take was chosen and why, cost so far.
+5. **Stops and asks only if:** a scene cannot be staged within safety rules after Stunt & Safety's rewrite; a line cannot fit the clip budget without changing the script; the Line Producer's budget cap is hit; or a required reference (e.g. a real location/product image) is missing.
+6. Delivers the episode master + the log + the budget report, then returns to `dailies` mode.
+
+Expectations to set with the Director: a 3-scene, ~90-second episode is roughly 30–60 minutes of unattended work depending on capacity; longer scripts scale linearly. First autopilot run on a new show should be short (2–3 scenes) so the crew's judgement can be checked before trusting it with an episode.
 
 ## 7. Dispatch rules of thumb
 
