@@ -142,11 +142,12 @@ def roll_once(lane_name, prompt, out, task="text_to_video", duration="15s", aspe
     if status != "completed":
         errs = resp.get("errors") or [{}]
         msg = errs[0].get("message", "") ; code = errs[0].get("code", "")
-        kind = "safety" if ("safety" in msg.lower() or "blocked" in str(code).lower() or "content_blocked" in str(code)) else "failed"
-        if not resp.get("usage"): kind = "capacity"  # empty usage = never ran
+        kind = "safety" if ("safety" in msg.lower() or "prohibited" in msg.lower() or "blocked" in str(code).lower() or "content_blocked" in str(code) or "prohibited_content" in str(code).lower()) else "failed"
+        if kind != "safety" and not resp.get("usage"): kind = "capacity"  # empty usage = never ran
         ledger([time.strftime("%F %T"), shot_id, lane_name, lane["model"], task, duration, resolution, kind, round(time.time()-t0,1), iid, msg[:120]])
         raise RollError(kind, f"interaction {status}: {msg}", json.dumps(errs)[:600])
-    for o in resp.get("outputs", []):
+    out_containers = resp.get("outputs") or [s for s in resp.get("steps", []) if s.get("type") == "model_output"]
+    for o in out_containers:
         for item in (o.get("content") or [o]):
             if item.get("type") == "video" and item.get("data"):
                 os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

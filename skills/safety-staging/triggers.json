@@ -81,6 +81,15 @@
       "rewrite": "Use reference_to_video anchored on the previous part's last frame instead of extend.",
       "example_before": "extend with the caller continuing",
       "example_after": "reference_to_video, image=part1_last.png, 'exact continuation of the reference image'"
+    },
+    {
+      "id": "synthetic-news-anchor",
+      "pattern": "\\b(news anchor|television newsroom|broadcast news anchor)\\b",
+      "symptom": "block",
+      "why": "trips synthetic TV news broadcast / public-figure impersonation filter (prohibited_content) when paired with a real-person reference photo",
+      "rewrite": "Stage the speaker visually as a friendly presenter/host in a modern glass office lobby holding a handheld microphone, and use a fictional first name for [Name] placeholders.",
+      "example_before": "Indian female broadcast news anchor in a television newsroom... I am Sucherita",
+      "example_after": "Friendly Indian woman in a modern glass office lobby holding a maroon handheld microphone... I am Maya"
     }
   ]
 }

@@ -1,4 +1,4 @@
-# AI Studio Crew — Getting Started (for Directors)
+# AI Studio Crew — Let's hire your crew
 
 > **You direct. We're the crew.**
 
