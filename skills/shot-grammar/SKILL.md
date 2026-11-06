@@ -1,6 +1,6 @@
 ---
 name: shot-grammar
-description: The DOP's prompt grammar for fast-action and dialogue scenes - timestamped shot lists, one action beat per shot, camera placement + screen direction, consistent character naming, style and audio on separate trailing lines, and the words that break multi-shot generation. Use when writing or fixing any shot list / video prompt.
+description: The DOP's prompt grammar - timestamped shot lists, one action beat per shot, camera + screen direction, consistent naming, style/audio trailing lines, the words that break multi-shot generation, and HOW TO DIRECT DIALOGUE (intention line + inline audio tags per sentence, <=30 words per clip) so reads are performed, not recited. Use when writing or fixing any shot list / video prompt.
 ---
 
 # Shot Grammar
@@ -37,6 +37,26 @@ Audio: <diegetic sounds, score yes/no, dialogue notes — one line>.
 10. **Dialogue shots:** paste the voice lock verbatim, then `He says, in <language>: "..."` with `...` for pauses and `*word*` for emphasis. Specify *who is not seen* ("the caller is never shown").
 11. **Chained shots** (> clip cap): Shot block starts with `VIDEO CONTINUATION of the reference image: same room, same lighting, same lens, same character…` and binds the previous part's last frame as the first reference.
 12. **Vertical (9:16):** whip-pans and wide two-shots lose subjects; prefer hard cuts and ¾ singles. Say so to the Director once.
+
+## Directing dialogue (the DOP's job)
+
+A line of dialogue in a prompt is a *performance*, not a transcript. Flat, robotic reads come from flat prompts ("say exactly these words"). Shape every line:
+
+```
+[Voice fingerprint — quoted verbatim from bible/voices/<name>/fingerprint.md]
+Intention: he is enjoying this; the threat is in how calm he is.
+He says, in Hindi: "[slow, almost warm] बधाई हो ऋषि। [beat] [smile] तुमने साबित कर दिया कि तुम *डेयरिंग* हो। [pause] [quieter, colder] मैं तुम्हें अपने प्रोग्राम में शामिल कर रहा हूँ।"
+```
+
+Rules:
+1. **Fingerprint first, direction second.** Identity never changes; direction changes every line.
+2. **One intention line per part** — what the character wants in this moment. It does more than ten adjectives.
+3. **Inline tags, sparingly:** `[pause]` `[beat]` `[slower]` `[quicker]` `[whisper]` `[smile]` `[cold]` `[warm]` `[breath]` `[rising]` `[falling]` `[trailing off]` `[hard stop]`, `*word*` for emphasis, `...` for a hold. 2–4 tags per sentence; more becomes noise.
+4. **Vary the shape on purpose.** If three sentences in a row have the same tag pattern, rewrite one. A good read has a quiet sentence, a punched word, and a hold.
+5. **≤ 30 words per 15s clip.** Room for breath and pauses is what makes it sound human.
+6. **Talking to one person.** Add "speaking to one person across a table, not reading" for presenters and narrators — it kills the teleprompter cadence.
+7. Never describe the voice in the direction ("deep baritone") — that is Casting's fingerprint; repeating it differently *causes* drift.
+8. If a read comes back flat, the fix is stronger intention + fewer words, not a higher speech rate.
 
 ## Worked example (approved)
 

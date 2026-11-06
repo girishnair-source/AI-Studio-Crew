@@ -11,14 +11,27 @@ Script: `scripts/dailies_qc.py` (ffmpeg/ffprobe).
 QC=<plugin>/skills/dailies-qc/scripts/dailies_qc.py
 python3 $QC scene   --dir production/dailies/EP01_SC04          # everything: contacts, last frames, qc.json
 python3 $QC contact --video 4A_take1.mp4 --frames 5              # then read_file the PNG to *look*
-python3 $QC speech  --video 4A_take1.mp4                         # {"speech_end": 14.6, "margin": 0.4, "flags": [...]}
+python3 $QC speech  --video 4A_take1.mp4 --profile presenter    # {"speech_end": 14.6, "margin": 0.4, "f0_std_semitones": 3.4, "monotone": true, ...}
 python3 $QC last    --video 4A_take1.mp4                         # 4A_take1_last.png for CHAIN shots
 ```
 
 ## What each crew member looks for
 
 - **Script Supervisor** — contact sheets vs bible: wardrobe, glasses, hair, props, screen direction, background set, light direction. Face drift between takes.
-- **Voice Director / Mixer** — `margin` ≥ 0.4s (else the last word is probably clipped → retake, not fade); `speech-starts-at-zero` (needs a handle); `audio-peaks-hot`.
+- **Dialogue Coach / Mixer** — `margin` ≥ 0.4s (else the last word is probably clipped → retake, not fade); `speech-starts-at-zero`; `audio-peaks-hot`; **`monotone-read`** → the DOP's performance tags were too weak or ignored; retake with stronger intention and fewer words, never a faster rate.
+
+## Monotony metric (`--profile`)
+
+Pitch is estimated per 10 ms (autocorrelation, 70–400 Hz); `f0_std_semitones` is word-level pitch movement, `contour_std_semitones` is phrase-level intonation (per-second medians). Thresholds depend on the role — a presenter must move more than a cold villain:
+
+| profile | min f0 std | min contour std | use for |
+|---|---|---|---|
+| `presenter` | 4.5 | 3.0 | hosts, explainers, influencer pieces, anchors |
+| `narration` | 3.5 | 2.2 | VO, documentary |
+| `dialogue` (default) | 3.0 | 1.8 | scene dialogue |
+| `cold` | 2.0 | 1.0 | deliberately flat reads (villain on the phone, AI voice) |
+
+Calibration from our own dailies: influencer presenter clips 3.4–3.9 st (flagged under `presenter` — matches viewer feedback "monotonous"), hacker call 5.6–6.1 st, Hindi narrator 3.0 st. Treat the flag as a prompt to listen, not a verdict.
 - **DOP** — framing and motion read as designed; vertical crops; whip-pans that lost the subject.
 - **Editor** — uses `trim_to` as the default out-point per take.
 

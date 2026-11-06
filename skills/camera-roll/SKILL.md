@@ -35,6 +35,10 @@ Output: one JSON line per shot with `status` ∈ `ok | safety | capacity | auth 
 6. **Drafts vs finals.** Drafts at `360p`/`720p` on the default lane; approved shots re-rolled at `resolution_final` from `show.json` only if the draft is approved (Line Producer policy).
 7. Every roll appends to `production/reports/ledger.csv` automatically.
 
+## Voice consistency
+
+There is no voice-cloning / audio-identity input in production. Voice identity is carried **in text**: Casting's `bible/voices/<name>/fingerprint.md`, quoted verbatim at the top of every dialogue prompt, followed by the DOP's directed line (intention + audio tags). `--audio` exists only for audio-to-video (driving picture from a finished track); do not use it as a voice reference.
+
 ## Known model behaviours (keep updated)
 
 - Will render legible on-screen text when asked explicitly ("large white monospaced text typed letter by letter: LIKE FOLLOW DIE"), but may *also* add its own captions on talking-head shots — Editor overlays text deterministically instead.

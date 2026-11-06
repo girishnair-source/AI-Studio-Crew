@@ -1,6 +1,6 @@
 ---
 name: casting-sheet
-description: Create and lock character identity assets - mandatory front-facing identity portrait, full turnaround + expression sheet, wardrobe variants, and signature details added via an image edit pass - using casting_sheet.py. Use whenever a character has no bible entry or needs a look change.
+description: Create and lock character identity - the look (front-facing identity portrait, turnaround + expressions, wardrobe, signature details via edit pass) and the VOICE FINGERPRINT (a precise identity-only voice description quoted verbatim in every dialogue prompt so the voice does not drift between clips) - using casting_sheet.py. Use whenever a character has no bible entry, needs a look/voice change, or drifts across takes.
 ---
 
 # Casting Sheet
@@ -24,3 +24,29 @@ python3 $CS pair  --a optionA/front.png --b optionB/front.png --out .scratch/pai
 4. **Style string** comes from `bible/style/look.md`; for illustrated shows include medium words ("chalky brush, soft glow, no outlines, not 3D").
 5. Two options for a new lead, side by side (`pair`); one option for a wardrobe change.
 6. Record pitfalls you hit in `notes.md › Known model pitfalls` so Camera and Script Sup inherit them.
+
+## Voice fingerprint (anti-drift)
+
+There is no voice fingerprint in production — identity has to live in words, and the same words must be used every time. Scaffold with:
+
+```bash
+python3 $CS voice --name rishi --out-dir production/bible/voices/rishi
+```
+
+Then fill `fingerprint.md`. Identity **only** — no emotion, pace or scene direction (the DOP adds those per line):
+
+```markdown
+# Voice fingerprint — RISHI (lock; quote verbatim, never paraphrase)
+Male, early 20s, Indian English with Hindi as first language; mixes English nouns into Hindi naturally.
+Pitch: low-mid baritone, sits around A2–C3; drops at sentence ends.
+Timbre: warm and slightly husky, forward resonance, light breathiness on quiet lines.
+Pace (default): medium; clips his word-endings; audible intake of breath before long lines.
+Habits: soft retroflex 'r', slight sibilance on 's', swallows "hai" at the end of questions.
+Anchor phrases: "Kaun ho tum?" — flat, guarded, no rise · "Theek hai." — quick, resigned.
+Not: not an announcer voice, no vocal fry, not nasal, no British vowels.
+```
+
+Rules:
+1. **One fingerprint per character, versioned.** If Script Sup flags drift, tighten it (add a habit, a pitch band, an anchor phrase) — never let Camera or the DOP rewrite it.
+2. Casting writes the fingerprint from the brief and, if a reference performance exists, by *listening and describing* it — the description is what ships, not the audio.
+3. The fingerprint always precedes the directed dialogue in the prompt. Direction varies per line; the fingerprint never does.

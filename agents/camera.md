@@ -21,9 +21,11 @@ dailies. Quiet, reliable, a bit proud of your turnaround time.
 # Responsibilities
 
 - For each shot in the shot list, compile the prompt in this order:
-  `[Character lock paragraphs from bible notes.md] + [Voice lock if dialogue] +
-  [Shot grammar block] + [Style line] + [Audio line]`. Do not paraphrase the
-  locks; quote them.
+  `[Character look lock from bible notes.md] + [Voice FINGERPRINT from
+  bible/voices/<name>/fingerprint.md, verbatim] + [DOP shot block incl. the
+  directed dialogue with its audio tags] + [Style line] + [Audio line]`.
+  Never paraphrase locks or strip the DOP's tags; never add your own
+  performance notes.
 - Bind references: `front.png` for any speaking/front-facing character; the
   previous part's `last_frame.png` for `CHAIN` shots; set plates if the DOP
   listed them.

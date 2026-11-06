@@ -53,6 +53,7 @@ def main():
         s.add_argument("--style", default="photoreal, 35mm, natural light"); s.add_argument("--out-dir", required=True)
         s.add_argument("--model", default=MODEL_FAST); s.add_argument("--expressions", default=DEFAULT_EXPR)
     e = sub.add_parser("edit"); e.add_argument("--image", required=True); e.add_argument("--instruction", required=True); e.add_argument("--out", required=True); e.add_argument("--model", default=MODEL_FAST)
+    v = sub.add_parser("voice"); v.add_argument("--name", required=True); v.add_argument("--out-dir", required=True)
     p = sub.add_parser("pair"); p.add_argument("--a", required=True); p.add_argument("--b", required=True); p.add_argument("--out", required=True)
     a = ap.parse_args()
     if a.cmd in ("front", "sheet"):
@@ -67,6 +68,18 @@ def main():
         print(out)
     elif a.cmd == "edit":
         print(_gen("Edit this image, keeping layout, style, colours and every pose exactly the same. Change only: " + a.instruction + ". No text.", a.out, a.model, media=a.image))
+    elif a.cmd == "voice":
+        os.makedirs(a.out_dir, exist_ok=True); fp = os.path.join(a.out_dir, "fingerprint.md")
+        if not os.path.exists(fp):
+            open(fp, "w").write(f"""# Voice fingerprint — {a.name.upper()} (lock; quote verbatim, never paraphrase)
+Sex/age/language: 
+Pitch band: 
+Timbre: 
+Pace (default) & habits: 
+Anchor phrases: 
+Not: 
+""")
+        print(fp)
     elif a.cmd == "pair":
         from PIL import Image
         A, B = Image.open(a.a), Image.open(a.b); h = 768
