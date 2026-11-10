@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Escalation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scene",
+    "shot",
+    "takes_tried",
+    "reason_code",
+    "reason",
+    "options",
+    "recommended"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "Escalation/1"
+      ]
+    },
+    "scene": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "shot": {
+      "type": "string",
+      "maxLength": 20
+    },
+    "takes_tried": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "auto_retakes_used": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reason_code": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "reason": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "at": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "label"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 2
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "effect": {
+            "type": "string",
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "recommended": {
+      "type": "string",
+      "maxLength": 2
+    },
+    "question": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "resolved": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

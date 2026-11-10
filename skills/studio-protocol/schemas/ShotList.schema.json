@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ShotList",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scene",
+    "aspect",
+    "style",
+    "audio",
+    "shots"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "ShotList/1"
+      ]
+    },
+    "scene": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[A-Za-z0-9_\\-]+$"
+    },
+    "aspect": {
+      "enum": [
+        "9:16",
+        "16:9"
+      ]
+    },
+    "resolution": {
+      "enum": [
+        "360p",
+        "720p",
+        "1080p",
+        "4k"
+      ]
+    },
+    "style": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "audio": {
+      "type": "string",
+      "maxLength": 400
+    },
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "duration_s",
+          "camera",
+          "action"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 20,
+            "pattern": "^[A-Za-z0-9]+$"
+          },
+          "duration_s": {
+            "enum": [
+              5,
+              10,
+              15
+            ]
+          },
+          "chain_from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "camera": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "direction": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "staging": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "characters": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "refs": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            }
+          },
+          "profile": {
+            "enum": [
+              "presenter",
+              "narration",
+              "dialogue",
+              "cold"
+            ]
+          },
+          "dialogue": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "speaker",
+                "intention",
+                "line"
+              ],
+              "properties": {
+                "speaker": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "language": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "intention": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "line": {
+                  "type": "string",
+                  "maxLength": 700
+                },
+                "on_screen": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

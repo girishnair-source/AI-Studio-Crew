@@ -39,32 +39,38 @@ def prosody(video, profile="dialogue"):
     if len(x) < sr: return {}
     win, hop = 640, 160  # 40ms / 10ms
     fmin, fmax = 70, 400; lag_min, lag_max = sr // fmax, sr // fmin
-    f0s, voiced = [], []
+    f0_track, voiced = [], []  # f0 per 10ms frame, NaN when unvoiced (time-indexed)
     for i in range(0, len(x) - win, hop):
         f = x[i:i + win]; e = float(np.sqrt(np.mean(f ** 2)))
-        if e < 0.008: voiced.append(0); continue
+        if e < 0.008: voiced.append(0); f0_track.append(np.nan); continue
         f = f - f.mean(); ac = np.correlate(f, f, "full")[win - 1:]; ac /= (ac[0] + 1e-9)
         seg = ac[lag_min:lag_max]; k = int(np.argmax(seg)); peak = float(seg[k])
-        if peak < 0.5: voiced.append(0); continue
-        voiced.append(1); f0s.append(sr / (lag_min + k))
+        if peak < 0.5: voiced.append(0); f0_track.append(np.nan); continue
+        voiced.append(1); f0_track.append(sr / (lag_min + k))
+    f0_track = np.array(f0_track, dtype=float)
+    f0s = f0_track[~np.isnan(f0_track)]
     if len(f0s) < 30: return {}
-    f0 = np.array(f0s); st = 12 * np.log2(f0 / np.median(f0))
-    st = st[np.abs(st) < 12]  # drop octave errors
+    med = np.median(f0s); st_track = 12 * np.log2(f0_track / med)
+    st_track[np.abs(st_track) > 12] = np.nan  # octave errors
+    st = st_track[~np.isnan(st_track)]
     f0_std = float(np.std(st))
-    # pace variance: lengths of voiced runs (approx syllable groups) in 10ms frames
     runs, cur = [], 0
     for v in voiced:
         if v: cur += 1
         elif cur: runs.append(cur); cur = 0
     runs = np.array(runs) if runs else np.array([1])
     pace_cv = float(np.std(runs) / (np.mean(runs) + 1e-9))
-    # phrase-level contour: std of per-second median pitch (slow intonation movement)
-    sec = max(1, int(sr / hop))
-    per_sec = [np.median(st[i:i + sec]) for i in range(0, len(st), sec) if len(st[i:i + sec]) > 5]
-    contour_std = float(np.std(per_sec)) if len(per_sec) > 2 else 0.0
+    # phrase-level contour: per-second median pitch over TIME (ignore seconds with <10 voiced frames)
+    fps = sr // hop
+    per_sec = []
+    for i in range(0, len(st_track), fps):
+        seg = st_track[i:i + fps]; seg = seg[~np.isnan(seg)]
+        if len(seg) >= 10: per_sec.append(float(np.median(seg)))
+    contour_std = float(np.std(per_sec)) if len(per_sec) >= 3 else float("nan")
     t_f0, t_contour = PROSODY_PROFILES.get(profile, PROSODY_PROFILES["dialogue"])
-    monotone = bool(f0_std < t_f0 or contour_std < t_contour)
-    return {"f0_std_semitones": round(f0_std, 2), "contour_std_semitones": round(contour_std, 2), "pace_cv": round(pace_cv, 2), "prosody_profile": profile, "monotone": monotone}
+    import math
+    monotone = bool(f0_std < t_f0 or (not math.isnan(contour_std) and contour_std < t_contour))
+    return {"f0_std_semitones": round(f0_std, 2), "contour_std_semitones": (None if math.isnan(contour_std) else round(contour_std, 2)), "pace_cv": round(pace_cv, 2), "prosody_profile": profile, "monotone": monotone}
 
 def speech(video, floor=-38.0, hold=0.45, step=0.05, profile="dialogue"):
     tmp = video + ".rms.txt"

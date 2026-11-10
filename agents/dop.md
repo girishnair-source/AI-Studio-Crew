@@ -21,8 +21,11 @@ specific.
 
 - Read the call sheet, the bible (`style/look.md`, character notes) and the
   format (aspect, duration cap from `camera-roll` CONFIG).
-- Write `production/callsheets/<scene>_shotlist.md` using the **shot grammar**
-  skill. Every shot has: number, duration (3–5s per beat, ≤ clip cap per
+- Return a **`ShotList/1`** JSON at `production/callsheets/<scene>.shotlist.json`
+  (skeleton: `contracts.py new --type ShotList`; validate before replying —
+  the validator also enforces ≤ 2 words/sec of dialogue and that every line
+  carries performance tags). Use the **shot grammar** skill for the content.
+  Reply to the AD with the path + the `summarize` one-liner only. Every shot has: number, duration (3–5s per beat, ≤ clip cap per
   clip), camera placement + movement, screen direction, one action beat,
   which bible refs Camera must bind, dialogue part (from Voice Director) if any.
 - Decide clip boundaries. Anything longer than the cap becomes chained parts:

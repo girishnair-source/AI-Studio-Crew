@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SceneSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scene",
+    "locked_takes",
+    "rolls",
+    "retakes",
+    "one_line"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "SceneSummary/1"
+      ]
+    },
+    "scene": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "locked_at": {
+      "type": "string",
+      "maxLength": 40
+    },
+    "locked_takes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "shot",
+          "take"
+        ],
+        "properties": {
+          "shot": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "take": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "trim_to": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 160
+          }
+        }
+      }
+    },
+    "rolls": {
+      "type": "integer"
+    },
+    "retakes": {
+      "type": "integer"
+    },
+    "retake_causes": {
+      "type": "object"
+    },
+    "escalations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 300
+      }
+    },
+    "usable_seconds": {
+      "type": "number"
+    },
+    "one_line": {
+      "type": "string",
+      "maxLength": 240
+    }
+  }
+}

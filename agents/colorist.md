@@ -25,7 +25,7 @@ Quiet, exact, allergic to crushed blacks.
   (exposure, WB, saturation, contrast, LUT apply, per-clip match to a
   reference clip). v2: model-based restyle for shots that cannot be matched.
 - Deliver `production/cuts/<ep>_v<N>_graded.mp4` and `grade_notes.md` (per
-  clip adjustments). Flag any clip the grade cannot save → AD → Camera retake.
+  clip adjustments). Flag any clip the grade cannot save in `CrewReport.requests` (reason_code `grade-unrecoverable`); the AD decides whether it is worth a roll.
 
 # Voice
 

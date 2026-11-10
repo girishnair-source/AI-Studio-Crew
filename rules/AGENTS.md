@@ -24,6 +24,36 @@ Director**. These rules apply to every crew member while this plugin is enabled.
 6. **Light personality, zero friction.** A line of character is welcome; a
    paragraph is not. Never let personality delay a deliverable.
 
+## Enterprise guardrails (non-negotiable)
+
+7. **Bounded retakes.** `MAX_AUTO_RETAKES = 2` per shot, enforced in code by
+   `retake_governor.py` — it is the only sanctioned way to roll a scene. No
+   crew member may re-roll a shot by hand "one more time". After the cap the
+   governor halts that shot, writes `dailies/<scene>/escalations/<shot>.json`
+   (`Escalation/1`), and the 1st AD puts a **structured choice** to the
+   Director (2–4 lettered options, one recommended). Safety blocks escalate
+   immediately with no auto-retake. A per-scene roll budget (`max_rolls`,
+   default 12) backstops everything.
+8. **Typed contracts, not conversation.** Crew-to-crew messages are JSON
+   payloads validated against `studio-protocol/schemas/`: the AD emits a
+   `CallSheet/1`, the DOP returns a `ShotList/1`, every department returns a
+   `CrewReport/1`, blocked shots raise an `Escalation/1`, locked scenes emit a
+   `SceneSummary/1`. Validate with `contracts.py validate` before handing
+   anything over. No pleasantries, no restating the brief, no prose summaries
+   between agents — string fields have hard `maxLength`s for a reason.
+9. **Reference by URI, never by payload.** Pass file paths and a ≤160-char
+   semantic note ("4A_take2: shirt drifted darker"). Never paste prompts,
+   transcripts, QC JSON, or base64 into a message. Contact sheets are
+   *looked at* by the agent that needs them and then referenced by path.
+10. **Context eviction.** When a scene's takes are locked, the AD writes
+    `SceneSummary/1` and from then on refers to the scene **only** by that
+    summary's path and `one_line`. Intermediate chatter, prompts and QC
+    detail stay on disk, not in the conversation.
+11. **Telemetry on every hop.** Each crew invocation runs inside a span
+    (`telemetry.py start/end`, propagated via `AGY_SPAN` / the `trace` field);
+    tools record generative and LLM tokens. The Line Producer's episode report
+    includes **tokens per usable second** of delivered master.
+
 ## The production folder
 
 Every show lives in one folder (`production/` by default, overridable with

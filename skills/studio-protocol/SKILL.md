@@ -1,6 +1,6 @@
 ---
 name: studio-protocol
-description: How the AI Studio Crew runs a production - the production folder layout, show.json schema, call sheet / shot list / dailies / cut sheet templates, control modes, and the dispatch order the 1st AD follows. Read this before creating or touching any production.
+description: How the AI Studio Crew runs a production - production folder, show.json, typed contracts between crew (CallSheet/ShotList/CrewReport/Escalation/SceneSummary JSON schemas + contracts.py), the bounded retake governor (MAX_AUTO_RETAKES=2, structured escalation), context-eviction rules, telemetry (spans + tokens per usable second), control modes and Autopilot. Read this before creating or touching any production.
 ---
 
 # Studio Protocol
@@ -120,3 +120,50 @@ Expectations to set with the Director: a 3-scene, ~90-second episode is roughly 
 - Composer only when the brief wants score, or at the Editor's request.
 - Colorist when a scene has >1 lighting setup or dailies show mismatch.
 - Line Producer on any 401/403/capacity error and at episode end.
+
+
+## 8. Typed contracts (crew talk in JSON, not prose)
+
+Schemas: `schemas/*.schema.json`. Tool: `scripts/contracts.py`.
+
+| Contract | Emitted by | Consumed by | Path |
+|---|---|---|---|
+| `CallSheet/1` | 1st AD | everyone | `callsheets/<scene>.callsheet.json` |
+| `ShotList/1` | DOP | Stunt & Safety, Camera | `callsheets/<scene>.shotlist.json` |
+| `CrewReport/1` | every department | 1st AD | `dailies/<scene>/<agent>_report.json` |
+| `Escalation/1` | retake governor | 1st AD → Director | `dailies/<scene>/escalations/<shot>.json` |
+| `SceneSummary/1` | retake governor | 1st AD, Editor, Line Producer | `dailies/<scene>/scene_summary.json` |
+
+```bash
+SP=<plugin>/skills/studio-protocol/scripts
+python3 $SP/contracts.py new --type ShotList > callsheets/EP01_SC04.shotlist.json   # skeleton
+python3 $SP/contracts.py validate --type ShotList --file callsheets/EP01_SC04.shotlist.json
+python3 $SP/contracts.py summarize --type CrewReport --file dailies/EP01_SC04/camera_report.json  # 1 line for chat
+python3 $SP/contracts.py shotlist-to-manifest --shotlist callsheets/EP01_SC04.shotlist.json --bible bible --out callsheets/EP01_SC04.manifest.json
+```
+
+The validator enforces terseness (`maxLength` on every string), ≤ 2 words/sec of dialogue per shot, performance tags on every line, unique shot ids, valid chains, and `max_auto_retakes ≤ 2`. A dispatch message between agents is: contract type · input path(s) · output path · span. Nothing else.
+
+## 9. Bounded retakes — the governor
+
+```bash
+python3 $SP/retake_governor.py run --manifest callsheets/EP01_SC04.manifest.json --scene EP01_SC04 [--max-rolls 12] [--parallel 6]
+# exit 0 = all shots locked · exit 3 = one or more Escalation/1 written
+```
+
+Per shot: roll → QC → deterministic auto-fix for the reason code → roll again, **at most `MAX_AUTO_RETAKES = 2`** (hard-coded ceiling; a CallSheet may lower it, never raise it). Then it stops, writes `Escalation/1` with evidence and 2–4 lettered options, and the AD asks the Director. Safety blocks escalate immediately. A per-scene `max_rolls` budget backstops the whole scene. The governor is the only sanctioned way to roll; no agent re-rolls by hand.
+
+## 10. Context discipline
+
+- **Reference by URI.** Paths + one ≤160-char note. Never paste prompts, QC JSON, transcripts or images into a message.
+- **Evict on lock.** After `scene_summary.json` exists, the scene is referred to only by that path and its `one_line`. The Editor reads `locked_takes` from it; nobody re-reads dailies chatter.
+- Contact sheets are looked at by the agent that needs them (`read_file` on the PNG), then cited by path.
+
+## 11. Telemetry
+
+`scripts/telemetry.py` writes OpenTelemetry-shaped spans (trace/span/parent ids, ns timestamps, attributes, status) to `reports/trace.jsonl`; exports via OTLP too if the SDK and `OTEL_EXPORTER_OTLP_ENDPOINT` are present. The governor and camera already emit `scene → shot → camera.roll / qc` spans and record generative + LLM tokens from the API `usage` block. Propagate the parent span to subagents via `AGY_SPAN='<span json>'`.
+
+```bash
+python3 $SP/telemetry.py report --production production --episode EP01 --md > reports/EP01_efficiency.md
+```
+Reports usable seconds (masters), generated seconds, **yield**, rolls ok/total, LLM and generative tokens, **tokens per usable second**, and a per-department table (spans, ms, tokens, errors). The Line Producer owns this.

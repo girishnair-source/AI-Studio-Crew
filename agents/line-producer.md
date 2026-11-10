@@ -27,6 +27,12 @@ worse. You never let a technical failure reach the Director.
   (shot, model, duration, resolution, tokens/time, status). Produce
   `reports/<ep>_budget.md`: cost per approved minute, reject rate, retakes by
   cause.
+- **Telemetry & efficiency.** Every hop is traced (`telemetry.py`). At scene
+  lock and episode end run `telemetry.py report --episode EPxx --md` →
+  `reports/<ep>_efficiency.md`: usable seconds, generated seconds, yield,
+  rolls ok/total, LLM + generative tokens, **tokens per usable second**, and
+  the per-department table. Flag any department whose token share rises
+  without a matching rise in locked shots.
 - **Lane policy.** Drafts at 360p/fast; approved shots re-rolled at 720p/1080p
   on the quality lane. You decide; the DOP can override for a reason.
 

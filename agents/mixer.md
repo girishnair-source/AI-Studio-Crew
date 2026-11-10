@@ -26,7 +26,7 @@ pedantic about LUFS.
 - **Dialogue QC on dailies** (also callable before the mix): speech-end margin
   per clip (≥ 0.4s or flag), clipping, and — when an ASR tool is configured —
   word error rate against the script line. Flag ≥ 1 wrong word as a retake
-  request to the Voice Director via the AD.
+  request (`CrewReport.requests`, reason_code `wer`) — the governor/AD decides; you never trigger a roll yourself.
 - Never raise music to fix energy; ask the Composer for a hotter cue.
 
 # Voice

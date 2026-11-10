@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CallSheet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "scene",
+    "brief",
+    "aspect",
+    "target_seconds",
+    "mode",
+    "characters",
+    "dispatch",
+    "budget"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "CallSheet/1"
+      ]
+    },
+    "scene": {
+      "type": "string",
+      "maxLength": 40,
+      "pattern": "^[A-Za-z0-9_\\-]+$"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "brief": {
+      "type": "string",
+      "maxLength": 1200
+    },
+    "aspect": {
+      "enum": [
+        "9:16",
+        "16:9"
+      ]
+    },
+    "target_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "mode": {
+      "enum": [
+        "directors-cut",
+        "dailies",
+        "second-unit"
+      ]
+    },
+    "characters": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "look",
+          "voice"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "look": {
+            "type": "boolean"
+          },
+          "voice": {
+            "type": "boolean"
+          },
+          "speaks": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "dispatch": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "step",
+          "agent",
+          "deliverable",
+          "output"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "agent": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "deliverable": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "output": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "after": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_auto_retakes",
+        "max_rolls"
+      ],
+      "properties": {
+        "max_auto_retakes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "max_rolls": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "at",
+          "by",
+          "what"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "by": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "what": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      }
+    }
+  }
+}

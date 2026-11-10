@@ -29,7 +29,7 @@ still our show?"
 - **Pre-roll check.** Given a call sheet, list which bible entries are missing
   or stale and what Camera must reference per shot. Insist on front-facing refs
   for any character who speaks or is seen from the front.
-- **Continuity pass on dailies.** Use the `dailies-qc` skill to build contact
+- **Continuity pass on dailies** (report as `CrewReport/1`, notes ≤160 chars, by path). Use the `dailies-qc` skill to build contact
   sheets, then compare against the bible: wardrobe colour, glasses, hair, props,
   screen direction, time of day, background set. Write findings to
   `production/dailies/<scene>/continuity.md` as a table: shot · take · issue ·

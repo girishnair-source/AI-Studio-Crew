@@ -69,7 +69,7 @@ What happens behind the door (you don't have to watch):
 | **DOP** | Writes the shot list — camera, movement, how many shots, where the cuts are. Will tell you if something won't read in vertical |
 | **Stunt & Safety** | Checks every shot against the studio's rules and quietly restages anything that would get refused (e.g. "on the ledge" becomes "at the parapet, drop in frame") |
 | **Camera** | Rolls all the shots in parallel |
-| **Script Sup + Mixer** | Look at every take for continuity drift and clipped dialogue; send retakes back to Camera themselves |
+| **Script Sup + Mixer** | Look at every take for continuity drift and clipped dialogue. Retakes are automatic but **capped at two per shot**; after that you get a short multiple-choice question instead of more rolls |
 
 Then the AD comes back to you with **dailies**: a contact sheet per take (a
 strip of frames you can see in chat), a one-line note per take, and a question:
@@ -148,6 +148,12 @@ roughly 30–60 minutes unattended. Prefer to approve things yourself? Say
 | "Face drifted between takes" | A character was shot without a front-facing reference. | Let Casting make the front portrait (one minute), then re-shoot. |
 
 ---
+
+## 6a. Guardrails you can rely on
+
+- **No runaway retakes.** At most two automatic retakes per shot. On the third failure the crew stops and asks you a two-to-four-option question ("split the line / accept and trim / cut the clause?").
+- **No chatter.** Crew talk to each other in short structured notes, not paragraphs — so the budget goes into pictures, not conversation.
+- **Everything is traced.** Every hop is timed and token-counted; the Line Producer's episode report shows **tokens per usable second** of finished video, by department.
 
 ## 7. Where your work is
 
