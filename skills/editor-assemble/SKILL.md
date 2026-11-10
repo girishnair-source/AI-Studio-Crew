@@ -1,6 +1,6 @@
 ---
 name: editor-assemble
-description: Editor, Colorist and Post tools - assemble.py builds a cut from a JSON cut sheet (speech-aware trims, deterministic caption/lower-third overlays, hard cuts, black, EDL + OTIO export); title_reveal.py slams title words with synced bangs; grade.py applies/matches grades; deliver.py renders masters per spec with checksums and optional Drive upload. Use for every cut, title, grade and delivery.
+description: Editor, Colorist and Post tools - assemble.py builds a cut from a JSON cut sheet with a render cache (only changed clips re-render), meaning-gated transitions (dissolve=time passed, fade_black=ended, else cut), J-cut audio leads, eased punch-ins and captions, EDL + OTIO; title_reveal.py slams title words with synced bangs; grade.py applies grades and matches a whole scene to one hero shot; deliver.py renders masters per spec. Use for every cut, title, grade and delivery.
 ---
 
 # Editor Assemble
@@ -28,6 +28,15 @@ python3 $EA/deliver.py --in EP01_v1_mix.mp4 --show lfdk --ep EP01 --out-dir prod
  ]}
 ```
 `"out": "speech"` reads `trim_to` from the scene's `qc.json` (speech end + handle).
+
+Per-clip options (all optional): `transition` (`cut` | `dissolve` + `time_passed: true` | `fade_black` + `ended: true`), `transition_s`, `audio_lead_s` (J-cut: this clip's audio starts early under the previous picture), `punch_in: {at, to, dur}` (eased zoom landing on the stressed word), `overlays[].ease` (default true: 8-frame ease-in with a 6 px rise, 5-frame ease-out).
+
+**Render cache / locality.** Each clip part is cached by its spec; a new version re-renders only what changed. `<out>.changes.json` lists `re_rendered` vs `reused` and any transition downgrades. `assemble_v1.py` is the previous, simpler assembler.
+
+```bash
+python3 $EA/grade.py match-scene --hero 4A_take1.mp4 --clips 4B_take1.mp4 4C_take1.mp4 --out-dir graded/   # whole scene to one hero
+python3 $MX --video cut.mp4 --out cut_mix.mp4 --music cue.mp3 --music-in 2.0 --music-out 28.0 [--broadcast]  # see mixer skill
+```
 
 ## Rules
 

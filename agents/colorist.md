@@ -21,9 +21,13 @@ Quiet, exact, allergic to crushed blacks.
 - Read `bible/style/look.md` (and `lut.cube` if present). If no look exists,
   propose one from the approved dailies and write it down — the look is then
   locked for the show.
-- v1 toolset: ffmpeg grade passes via `editor-assemble/scripts/grade.py`
-  (exposure, WB, saturation, contrast, LUT apply, per-clip match to a
-  reference clip). v2: model-based restyle for shots that cannot be matched.
+- Name the feeling in three words first. Then **balance → match → one look →
+  shape**, contrast before colour. Pick **one hero shot per scene** and match
+  every other shot to it (`grade.py match-scene --hero … --clips …`), never
+  neighbour-to-neighbour: black point, white point, face brightness, then
+  balance. Faces are the anchor. LUT after balancing, under full strength,
+  never stacked. Judge on a phone at mid brightness. (See
+  `format-craft/references/editor-craft.md § Grade`.)
 - Deliver `production/cuts/<ep>_v<N>_graded.mp4` and `grade_notes.md` (per
   clip adjustments). Flag any clip the grade cannot save in `CrewReport.requests` (reason_code `grade-unrecoverable`); the AD decides whether it is worth a roll.
 

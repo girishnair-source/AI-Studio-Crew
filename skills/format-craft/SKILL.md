@@ -41,7 +41,7 @@ The crew's tools make clips. These references make them *good*. Each file is 2â€
 | `text-animation` | `references/text-animation.md` | invideo |
 | `occasion-slideshow` | `references/occasion-slideshow.md` | invideo |
 
-Cross-cutting: `captions.md`, `check-your-video.md`, `cost-rule.md`, `ad-platform-specs.md`.
+Cross-cutting: `editor-craft.md` (locality, transitions-as-sentences, motion/easing, sound mix & music in/out, grade order & hero matching, notes/disagreement â€” adapted from invideo-timeline, invideo-media and invideo-pipeline), `captions.md`, `check-your-video.md`, `cost-rule.md`, `ad-platform-specs.md`.
 
 ## Ten rules that apply to every format (lifted from the references because we kept breaking them)
 

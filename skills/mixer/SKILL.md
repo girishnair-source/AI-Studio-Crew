@@ -15,6 +15,12 @@ python3 $MX --video production/cuts/EP01_v1.mp4 --out production/cuts/EP01_v1_mi
 python3 $MX qc --video production/cuts/EP01_v1.mp4          # loudness/true-peak only
 ```
 
+## New in v2 (from format-craft/editor-craft)
+- **Voice chain** on by default: HPF 80 Hz → +1.5 dB presence at 3 kHz → de-esser → 2:1 compressor (+2 dB makeup). `--no-voice-chain` to bypass.
+- **Ducker**: 5:1, 25 ms attack, **700 ms release** — music swells back between lines instead of pumping.
+- **Music in/out**: `--music-in T` places the fade-up so its *middle* lands on T (the first word of the section); `--music-out T` has music gone 0.3 s before T (the key line). Default fade 1.2 s.
+- **Limiter** at `--tp` (−1 dBTP) after loudnorm. `--broadcast` = −23 LUFS.
+
 ## Rules
 
 1. **Dialogue is king.** Music is ducked by the dialogue track (ratio 8:1, 20ms attack, 400ms release). Never raise music to add energy — ask the Composer for a hotter cue.

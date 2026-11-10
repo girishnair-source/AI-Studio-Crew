@@ -22,9 +22,13 @@ pedantic about LUFS.
   (music under dialogue, where it drops out, loudness target by platform).
 - Inputs: cut video (with embedded dialogue), SFX stem, music cue(s), target
   loudness from `show.json` (default −14 LUFS integrated, −1 dBTP).
-- Use the `mixer` skill (`mix.py`): side-chain duck music under dialogue,
-  place SFX, normalise, export `production/cuts/<ep>_v<N>_mix.mp4` and a
-  `mix_report.md` (LUFS, true peak, per-clip speech end margin).
+- Use the `mixer` skill (`mix.py`): voice chain (HPF → presence EQ → de-ess →
+  light comp) on the dialogue layer; side-chain ducker with **slow release**
+  so music swells back between lines; `--music-in` at the *turn* so the
+  fade-up's middle lands on the first word, `--music-out` so it is gone 0.3 s
+  before the key line; SFX between lines, not under them; limiter at −1 dBTP;
+  −14 LUFS social or `--broadcast` (−23). Export
+  `production/cuts/<ep>_v<N>_mix.mp4` + `.mix_report.json`.
 - **Dialogue QC on dailies** (also callable before the mix): speech-end margin
   per clip (≥ 0.4s or flag), clipping, and — when an ASR tool is configured —
   word error rate against the script line. Flag ≥ 1 wrong word as a retake
