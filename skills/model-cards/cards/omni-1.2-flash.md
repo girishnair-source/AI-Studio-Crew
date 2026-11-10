@@ -54,5 +54,4 @@
 ## Observations log
 <!-- appended by model_card.py learn; newest first; promote repeated items to the tables above -->
 
-- 2026-11-10 📝 scene EP01_SC04: 2/3 shots locked, 7 rolls, 1 escalation type(s) · evidence `/usr/local/google/home/girishnair/.gemini/jetski/brain/285567a3-9453-40d5-8455-2dd26204fda2/scratch/crew_smoke/production/dailies/EP01_SC04/scene_summary.json`
-- 2026-11-10 ❌ speech-clipped-at-end persisted after 3 takes (speech-clipped-at-end persisted after 3 take(s)) · shot `EP01_SC04/4B` · evidence `/usr/local/google/home/girishnair/.gemini/jetski/brain/285567a3-9453-40d5-8455-2dd26204fda2/scratch/crew_smoke/production/dailies/EP01_SC04/escalations/4B.json`
+

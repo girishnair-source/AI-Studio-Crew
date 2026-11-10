@@ -21,25 +21,25 @@ The crew's tools make clips. These references make them *good*. Each file is 2â€
 
 ## Formats
 
-| `format` | reference | native to |
+| `format` | reference | origin |
 |---|---|---|
-| `shorts` | `references/shorts.md` | invideo |
-| `micro-drama` | `references/micro-drama.md` | **studio** |
-| `news-bulletin` | `references/news-bulletin.md` | **studio** |
-| `talking-head` | `references/talking-head.md` | **studio** |
-| `commercial` | `references/commercial.md` | invideo |
-| `ads` | `references/ads.md` | invideo |
-| `explainer` | `references/explainer.md` | invideo |
-| `launch-video` | `references/launch-video.md` | invideo |
-| `product-video` | `references/product-video.md` | invideo |
-| `short-film` | `references/short-film.md` | invideo |
-| `interview-cut` | `references/interview-cut.md` | invideo |
-| `review-cut` | `references/review-cut.md` | invideo |
-| `personal-video` | `references/personal-video.md` | invideo |
-| `invitations` | `references/invitations.md` | invideo |
-| `intro-logo` | `references/intro-logo.md` | invideo |
-| `text-animation` | `references/text-animation.md` | invideo |
-| `occasion-slideshow` | `references/occasion-slideshow.md` | invideo |
+| `shorts` | `references/shorts.md` | adapted (Apache-2.0) |
+| `micro-drama` | `references/micro-drama.md` | original |
+| `news-bulletin` | `references/news-bulletin.md` | original |
+| `talking-head` | `references/talking-head.md` | original |
+| `commercial` | `references/commercial.md` | adapted (Apache-2.0) |
+| `ads` | `references/ads.md` | adapted (Apache-2.0) |
+| `explainer` | `references/explainer.md` | adapted (Apache-2.0) |
+| `launch-video` | `references/launch-video.md` | adapted (Apache-2.0) |
+| `product-video` | `references/product-video.md` | adapted (Apache-2.0) |
+| `short-film` | `references/short-film.md` | adapted (Apache-2.0) |
+| `interview-cut` | `references/interview-cut.md` | adapted (Apache-2.0) |
+| `review-cut` | `references/review-cut.md` | adapted (Apache-2.0) |
+| `personal-video` | `references/personal-video.md` | adapted (Apache-2.0) |
+| `invitations` | `references/invitations.md` | adapted (Apache-2.0) |
+| `intro-logo` | `references/intro-logo.md` | adapted (Apache-2.0) |
+| `text-animation` | `references/text-animation.md` | adapted (Apache-2.0) |
+| `occasion-slideshow` | `references/occasion-slideshow.md` | adapted (Apache-2.0) |
 
 Cross-cutting: `editor-craft.md` (locality, transitions-as-sentences, motion/easing, sound mix & music in/out, grade order & hero matching, notes/disagreement â€” adapted from invideo-timeline, invideo-media and invideo-pipeline), `captions.md`, `check-your-video.md`, `cost-rule.md`, `ad-platform-specs.md`.
 

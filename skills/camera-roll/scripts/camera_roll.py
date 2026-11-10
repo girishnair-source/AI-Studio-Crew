@@ -22,8 +22,8 @@ import argparse, base64, concurrent.futures as cf, csv, getpass, json, mimetypes
 CONFIG = {
     "lanes": {
         # name: {model, host, project}. Lane names are stable; model ids change here only.
-        "omni-1.2": {"model": "gemini-omni-1.2-flash", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "genai-on-vertex-playground")},
-        "omni-1.1": {"model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "genai-on-vertex-playground")},
+        "omni-1.2": {"model": "gemini-omni-1.2-flash", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "")},
+        "omni-1.1": {"model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "")},
     },
     "default_lane": os.environ.get("AGY_LANE", "omni-1.2"),
     "fallback_lane": os.environ.get("AGY_FALLBACK_LANE", "omni-1.1"),
@@ -40,7 +40,7 @@ CONFIG = {
 }
 # Optional pre-release lane for internal testers: set AGY_PREVIEW_MODEL / AGY_PREVIEW_HOST / AGY_PREVIEW_PROJECT in the environment.
 if os.environ.get("AGY_PREVIEW_MODEL"):
-    CONFIG["lanes"]["preview"] = {"model": os.environ["AGY_PREVIEW_MODEL"], "host": os.environ.get("AGY_PREVIEW_HOST", "aiplatform.googleapis.com"), "project": os.environ.get("AGY_PREVIEW_PROJECT", CONFIG["lanes"]["omni-1.2"]["project"])}
+    CONFIG["lanes"]["preview"] = {"model": os.environ["AGY_PREVIEW_MODEL"], "host": os.environ.get("AGY_PREVIEW_HOST", "aiplatform.googleapis.com"), "project": os.environ.get("AGY_PREVIEW_PROJECT", os.environ.get("AGY_PROJECT", ""))}
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class RollError(Exception):
@@ -131,6 +131,7 @@ def normalize_duration(duration):
 
 def roll_once(lane_name, prompt, out, task="text_to_video", duration="8s", aspect="9:16", resolution="720p", images=(), audio=None, shot_id=""):
     lane = CONFIG["lanes"][lane_name]
+    if not lane.get("project"): raise RollError("request", "AGY_PROJECT is not set — export your Google Cloud project id (the one with Vertex AI enabled)")
     duration = normalize_duration(duration)
     if len(images) > CONFIG["max_reference_images"]: raise RollError("request", f"{len(images)} reference images > {CONFIG['max_reference_images']}")
     token = get_token()
@@ -202,7 +203,9 @@ def doctor():
     print("auth providers:")
     for name, fn in (("AGY_ACCESS_TOKEN", _token_env), ("stubby", _token_stubby), ("gcloud", _token_gcloud)):
         t = fn(); print(f"  {name:16s} {'ok' if t else '—'}")
+    if not os.environ.get("AGY_PROJECT"): print("  AGY_PROJECT         — not set (export AGY_PROJECT=<your-gcp-project>)")
     for ln, cfg in CONFIG["lanes"].items():
+        if not cfg.get("project"): print(f"  lane {ln:8s} {cfg['model']:34s} needs AGY_PROJECT"); continue
         url = f"https://{cfg['host']}/v1beta1/projects/{cfg['project']}/locations/global/interactions"
         try:
             _http("POST", url, get_token(), {})

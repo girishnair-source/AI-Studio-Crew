@@ -15,7 +15,8 @@ from camera_roll import get_token, CONFIG  # noqa: E402
 MODEL = os.environ.get("LYRIA_MODEL", "lyria-3-pro-preview")
 
 def render(brief, out, project=None):
-    project = project or CONFIG["lanes"]["prod"]["project"]
+    project = project or os.environ.get("AGY_PROJECT") or CONFIG["lanes"][CONFIG["default_lane"]].get("project")
+    if not project: raise SystemExit("AGY_PROJECT is not set")
     url = f"https://aiplatform.googleapis.com/v1beta1/projects/{project}/locations/global/interactions"
     req = urllib.request.Request(url, data=json.dumps({"model": MODEL, "input": [{"type": "text", "text": brief}]}).encode(),
                                  headers={"Authorization": f"Bearer {get_token()}", "Content-Type": "application/json"}, method="POST")

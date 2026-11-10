@@ -17,14 +17,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 BACKEND = os.environ.get("CASTING_BACKEND", "vertex")
 NB_MODEL = os.environ.get("CASTING_MODEL", "gemini-nano-banana-2.1")
 NB_LOCATION = os.environ.get("CASTING_LOCATION", "global")
-GEN = "/google/bin/releases/gemini-agents-generate/generate"          # internal fallback only
+GEN = os.environ.get("AGY_INTERNAL_IMAGE_CLI", "")                     # optional internal fallback; unset = never used
 MODEL_FAST = os.environ.get("CASTING_MODEL_FAST", "gempix-2-flash-lite-png")
 MODEL_PRO = os.environ.get("CASTING_MODEL_PRO", "gempix-2")
 
 def _vertex_image(prompt, out, aspect="1:1", size="1K", media=None, thinking="medium", tries=3):
     """Nano Banana 2.1 via Vertex generateContent. media: list of reference image paths (<=14). Returns out path."""
     from camera_roll import get_token, CONFIG
-    proj = os.environ.get("AGY_PROJECT", CONFIG["lanes"][CONFIG["default_lane"]]["project"])
+    proj = os.environ.get("AGY_PROJECT") or CONFIG["lanes"][CONFIG["default_lane"]].get("project")
+    if not proj: raise SystemExit("AGY_PROJECT is not set — export your Google Cloud project id")
     url = f"https://aiplatform.googleapis.com/v1/projects/{proj}/locations/{NB_LOCATION}/publishers/google/models/{NB_MODEL}:generateContent"
     parts = []
     for m in (media or []):
@@ -60,7 +61,7 @@ SHEET_TMPL = ("Landscape 16:9. {style}. Character design sheet of {desc}. Turnar
 DEFAULT_EXPR = "neutral, happy, angry, worried, surprised"
 
 def _gen(prompt, out, model, media=None, tries=4, aspect="1:1", size="1K"):
-    if BACKEND == "vertex" or not os.path.exists(GEN):
+    if BACKEND == "vertex" or not GEN or not os.path.exists(GEN):
         return _vertex_image(prompt, out, aspect=aspect, size=size, media=[media] if media else None)
     out = os.path.abspath(out)
     for i in range(tries):

@@ -13,6 +13,14 @@ observations into the tables (that step is human/agent judgement, deliberately n
 """
 import argparse, datetime, glob, json, os, sys, re
 
+def _rel(path):
+    """Evidence paths are stored relative to the production folder (or cwd); never absolute machine paths."""
+    if not path: return path
+    for base in (os.environ.get("AGY_PRODUCTION_DIR"), "production", os.getcwd()):
+        if base and os.path.abspath(path).startswith(os.path.abspath(base) + os.sep):
+            return os.path.relpath(path, os.path.dirname(os.path.abspath(base)) if base != os.getcwd() else base)
+    return os.path.basename(path)
+
 HERE = os.path.dirname(os.path.abspath(__file__)); CARDS = os.path.join(HERE, "..", "cards")
 LANE_TO_CARD = {"omni-1.2": "omni-1.2-flash", "omni-1.1": "omni-1.1-flash", "preview": "omni-1.2-flash", "veo-fast": "veo-3.1", "veo-quality": "veo-3.1", "veo-lite": "veo-3.1",
                 "image": "nano-banana-2.1", "music": "lyria-3-pro"}
@@ -29,6 +37,7 @@ def learn(model, kind, text, evidence=None, shot=None):
     marker = "## Observations log"
     if marker not in s: s += f"\n\n{marker}\n"
     tag = {"works": "✅", "fails": "❌", "note": "📝"}.get(kind, "📝")
+    evidence = _rel(evidence)
     line = f"- {datetime.date.today()} {tag} {text.strip()}" + (f" · shot `{shot}`" if shot else "") + (f" · evidence `{evidence}`" if evidence else "")
     head, tail = s.split(marker, 1)
     # insert after the marker and any HTML comment line

@@ -29,9 +29,12 @@ def main():
         if a.srt and not a.burn: shutil.copy(a.srt, os.path.splitext(out)[0] + ".srt")
         entry = {"file": os.path.basename(out), "sha256_16": sha(out), "bytes": os.path.getsize(out)}
         if a.upload == "drive":
-            g = "/google/bin/releases/gemini-agents-gdrive/gdrive"
-            if os.path.exists(g):
-                r = subprocess.run([g, "mutate", "upload", out], capture_output=True, text=True); entry["drive"] = r.stdout.strip()
+            # Any CLI that uploads a file and prints a link; set AGY_UPLOAD_CMD, e.g. 'gdrive files upload' or 'rclone copy ... remote:'
+            cmd = os.environ.get("AGY_UPLOAD_CMD")
+            if cmd:
+                r = subprocess.run(cmd.split() + [out], capture_output=True, text=True); entry["upload"] = (r.stdout or r.stderr).strip()[:200]
+            else:
+                entry["upload"] = "skipped: set AGY_UPLOAD_CMD"
         manifest.append(entry); print(json.dumps(entry))
     json.dump(manifest, open(os.path.join(a.out_dir, f"{a.show}_{a.ep}_manifest.json"), "w"), indent=2)
 

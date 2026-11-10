@@ -115,7 +115,8 @@ Think of this as the crew moving into the studio. All you need is Antigravity - 
 
    > Bring in my film crew. Clone **https://github.com/girishnair-source/AI-Studio-Crew.git**
    > into my Antigravity plugins folder as `ai-studio-crew`, enable the plugin,
-   > run its tech check, and tell me when the 1st AD is ready to take a brief.
+   > set `AGY_PROJECT` to my Google Cloud project `<your-project-id>`, run its tech
+   > check, and tell me when the 1st AD is ready to take a brief.
 
    Antigravity clones the repo, switches the plugin on, runs the studio's
    `doctor` (are the cameras reachable? am I signed in?) and reports back in

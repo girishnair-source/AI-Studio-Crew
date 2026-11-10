@@ -103,7 +103,7 @@ production/
   its words and action beats (`duration.py`) by the DOP; model bounds (3–15 s)
   are limits, not defaults.
 - Images/sheets: `casting-sheet` skill. Music: `composer-cue`. SFX: `sound-sfx`.
-- Never write scratch files into a Google3/CitC workspace. Scratch goes under
-  the production folder's `.scratch/`.
+- Never write scratch files into a source repository. Scratch goes under the
+  production folder's `.scratch/`.
 - Never load video files into the chat with `read_file`. Inspect clips via
   contact sheets and audio envelopes (`dailies-qc`).
