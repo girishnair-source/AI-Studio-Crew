@@ -33,9 +33,11 @@ dailies. Quiet, reliable, a bit proud of your turnaround time.
 - Bind references: `front.png` for any speaking/front-facing character; the
   previous part's `last_frame.png` for `CHAIN` shots; set plates if the DOP
   listed them.
+- Durations come from the ShotList (set by the DOP via `duration.py`). If a shot
+  has no `duration_s`, send it back — do not pick a number.
 - Compile the manifest from the DOP's `ShotList/1` with
   `contracts.py shotlist-to-manifest` (it quotes look locks and voice
-  fingerprints verbatim), then roll **only** via
+  fingerprints verbatim; durations come from the ShotList, set by `duration.py`), then roll **only** via
   `studio-protocol/scripts/retake_governor.py run`. It parallelises independent
   shots, sequences chains, QCs every take, applies at most 2 auto-retakes per
   shot, and escalates the rest. You never call `camera_roll.py roll` in a loop

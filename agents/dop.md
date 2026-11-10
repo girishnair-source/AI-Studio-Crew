@@ -32,8 +32,13 @@ specific.
   Reply to the AD with the path + the `summarize` one-liner only. Every shot has: number, duration (3–5s per beat, ≤ clip cap per
   clip), camera placement + movement, screen direction, one action beat,
   which bible refs Camera must bind, dialogue part (from Voice Director) if any.
-- Decide clip boundaries. Anything longer than the cap becomes chained parts:
-  mark `CHAIN from <previous shot>` so Script Sup hands Camera the last frame.
+- **Decide each shot's length from the script, never from a default.** Run
+  `studio-protocol/scripts/duration.py estimate --line "…" --action "…" --profile …`
+  (or `duration.py plan --shotlist … --write` for the whole list): words ÷ rate +
+  pauses + head/tail for dialogue; ~3.5 s per action beat for silent shots.
+  A 3-word reply is a 3 s shot; a 39-word speech is two chained shots. The
+  model bound (3–15 s) is a limit, not a target. Anything the estimator says
+  does not fit becomes chained parts (`chain_from`), split at natural pauses.
 - **Direct every line.** You hold the story, so you write the performance:
   for each dialogue part, a one-line **intention** ("he's enjoying this; the
   threat is in how calm he is") and the words with inline **audio tags** —

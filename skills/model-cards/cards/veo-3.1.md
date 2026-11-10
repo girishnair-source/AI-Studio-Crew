@@ -30,7 +30,7 @@ Treat as hypothesis until side-by-sides are logged.
 
 ## Probe plan
 1. Confirm API surface (`predictLongRunning` vs Interactions) → add adapter + `veo-fast` lane to CONFIG.
-2. Roll the same 3 prompts (car chase, product beauty, talking head) on Veo Fast, Veo Quality, Omni 1.5; log render time, tokens/cost, QC flags, and a one-line verdict each.
+2. Roll the same 3 prompts (car chase, product beauty, talking head) on Veo Fast, Veo Quality, Omni 1.2 Flash; log render time, tokens/cost, QC flags, and a one-line verdict each.
 3. Fill the table; move stable findings into `shot-grammar` and the Line Producer's lane policy.
 
 ## Observations log

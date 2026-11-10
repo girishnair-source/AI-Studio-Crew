@@ -8,7 +8,7 @@ backoff + lane fallback on capacity errors, typed safety-block reporting, last-f
 extraction for chaining, ledger append for the Line Producer.
 
 Usage (single shot):
-  camera_roll.py roll --prompt "..." --duration 15s --aspect 9:16 [--image ref.png ...] --out take1.mp4
+  camera_roll.py roll --prompt "..." --duration 7s   # duration comes from duration.py, never a fixed number --aspect 9:16 [--image ref.png ...] --out take1.mp4
 Usage (manifest, parallel):
   camera_roll.py batch --manifest shots.json --parallel 6
   manifest = [{"id":"4A","prompt":"...","duration":"15s","aspect":"9:16","images":["..."],"out":"..."}]
@@ -21,21 +21,26 @@ import argparse, base64, concurrent.futures as cf, csv, getpass, json, mimetypes
 # ───────────────────────────── CONFIG (the only place model/host names live) ─────────────────────────────
 CONFIG = {
     "lanes": {
-        # name: {model, host, project}
-        "preview": {"model": "macaron-cookie", "host": "staging-aiplatform.sandbox.googleapis.com", "project": "genai-on-vertex-playground"},
-        "prod":    {"model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "genai-on-vertex-playground")},
+        # name: {model, host, project}. Lane names are stable; model ids change here only.
+        "omni-1.2": {"model": "gemini-omni-1.2-flash", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "genai-on-vertex-playground")},
+        "omni-1.1": {"model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", "genai-on-vertex-playground")},
     },
-    "default_lane": os.environ.get("AGY_LANE", "preview"),
-    "fallback_lane": os.environ.get("AGY_FALLBACK_LANE", "prod"),
+    "default_lane": os.environ.get("AGY_LANE", "omni-1.2"),
+    "fallback_lane": os.environ.get("AGY_FALLBACK_LANE", "omni-1.1"),
+    # Durations are DECIDED PER SHOT from the script (studio-protocol/scripts/duration.py); these are only the model's bounds.
+    "min_clip_seconds": 3,
     "max_clip_seconds": 15,
-    "durations": ["5s", "10s", "15s"],
     "resolutions": ["360p", "720p", "1080p", "4k"],
+    "max_reference_images": 6,
     "retries": 3,
     "backoff_s": [8, 20, 45],
     "poll_s": 5,
     "timeout_s": 420,
     "ledger": os.path.join(os.environ.get("AGY_PRODUCTION_DIR", "production"), "reports", "ledger.csv"),
 }
+# Optional pre-release lane for internal testers: set AGY_PREVIEW_MODEL / AGY_PREVIEW_HOST / AGY_PREVIEW_PROJECT in the environment.
+if os.environ.get("AGY_PREVIEW_MODEL"):
+    CONFIG["lanes"]["preview"] = {"model": os.environ["AGY_PREVIEW_MODEL"], "host": os.environ.get("AGY_PREVIEW_HOST", "aiplatform.googleapis.com"), "project": os.environ.get("AGY_PREVIEW_PROJECT", CONFIG["lanes"]["omni-1.2"]["project"])}
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 class RollError(Exception):
@@ -116,8 +121,18 @@ def ledger(row):
         pass
 
 # ── core roll ────────────────────────────────────────────────────────────────────────────────────────────
-def roll_once(lane_name, prompt, out, task="text_to_video", duration="15s", aspect="9:16", resolution="720p", images=(), audio=None, shot_id=""):
+def normalize_duration(duration):
+    """Accept '7s', '7', 7, 7.4 -> clamp to [min,max] whole seconds, return 'Ns'."""
+    try: v = float(str(duration).rstrip("s"))
+    except ValueError: raise RollError("request", f"bad duration {duration!r}")
+    v = int(round(v)); lo, hi = CONFIG["min_clip_seconds"], CONFIG["max_clip_seconds"]
+    if v < lo or v > hi: raise RollError("request", f"duration {v}s outside model bounds {lo}-{hi}s; split or merge the shot (duration.py)")
+    return f"{v}s"
+
+def roll_once(lane_name, prompt, out, task="text_to_video", duration="8s", aspect="9:16", resolution="720p", images=(), audio=None, shot_id=""):
     lane = CONFIG["lanes"][lane_name]
+    duration = normalize_duration(duration)
+    if len(images) > CONFIG["max_reference_images"]: raise RollError("request", f"{len(images)} reference images > {CONFIG['max_reference_images']}")
     token = get_token()
     inputs = [{"type": "text", "text": prompt}] + [media_part(p, "image") for p in images]
     if audio: inputs.append(media_part(audio, "audio"))
@@ -195,12 +210,12 @@ def doctor():
         except RollError as e:
             tag = {"request": "✓ reachable", "auth": "✗ 401 token", "access": "✗ 403 no access", "capacity": "~ overloaded"}.get(e.kind, e.kind)
             print(f"  lane {ln:8s} {cfg['model']:34s} {tag}")
-    print(f"default lane: {CONFIG['default_lane']}  fallback: {CONFIG['fallback_lane']}  clip cap: {CONFIG['max_clip_seconds']}s")
+    print(f"default lane: {CONFIG['default_lane']}  fallback: {CONFIG['fallback_lane']}  clip bounds: {CONFIG['min_clip_seconds']}-{CONFIG['max_clip_seconds']}s (per-shot, from script)  max refs: {CONFIG['max_reference_images']}")
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("roll"); r.add_argument("--prompt", required=True); r.add_argument("--out", required=True)
-    r.add_argument("--task", default="text_to_video"); r.add_argument("--duration", default="15s"); r.add_argument("--aspect", default="9:16")
+    r.add_argument("--task", default="text_to_video"); r.add_argument("--duration", required=True, help="seconds, decided per shot by duration.py (e.g. 7s)"); r.add_argument("--aspect", default="9:16")
     r.add_argument("--resolution", default="720p"); r.add_argument("--image", action="append", default=[]); r.add_argument("--audio"); r.add_argument("--lane"); r.add_argument("--id", default="")
     b = sub.add_parser("batch"); b.add_argument("--manifest", required=True); b.add_argument("--parallel", type=int, default=6); b.add_argument("--lane")
     lf = sub.add_parser("last-frame"); lf.add_argument("--video", required=True); lf.add_argument("--out", required=True)
@@ -219,7 +234,7 @@ def main():
         shots = json.load(open(a.manifest))
         def one(s):
             try:
-                res = roll(s["prompt"], s["out"], lane=a.lane or s.get("lane"), task=s.get("task", "text_to_video"), duration=s.get("duration", "15s"),
+                res = roll(s["prompt"], s["out"], lane=a.lane or s.get("lane"), task=s.get("task", "text_to_video"), duration=s["duration"],
                            aspect=s.get("aspect", "9:16"), resolution=s.get("resolution", "720p"), images=s.get("images", []), audio=s.get("audio"), shot_id=s.get("id", ""))
                 return {"id": s.get("id"), "status": "ok", **res}
             except RollError as e:

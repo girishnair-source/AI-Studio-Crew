@@ -122,6 +122,14 @@ Expectations to set with the Director: a 3-scene, ~90-second episode is roughly 
 - Line Producer on any 401/403/capacity error and at episode end.
 
 
+## 7a. Durations come from the script
+
+```bash
+python3 $SP/duration.py estimate --profile cold --line "[slow] बधाई हो ऋषि। [beat] …"     # -> seconds needed, or a split
+python3 $SP/duration.py plan --shotlist callsheets/EP01_SC04.shotlist.json --write      # fills duration_s per shot; splits lines that don't fit into chained shots
+```
+Model: `words ÷ wps(profile) + 0.45 s per "..." + 0.25 s per [pause]/[beat] + 0.5 s head + 0.9 s tail`, silent shots `3.5 s × action beats`, rounded up to whole seconds, bounded by the model (3–15 s). The validator rejects a ShotList whose `duration_s` is below what its words need; the governor's first fix for a clipped line is **more seconds**, not a faster read. Tunables live in `duration.py CONFIG` and should be re-calibrated from dailies (`speech_end` vs estimate) by the Dialogue Coach.
+
 ## 8. Typed contracts (crew talk in JSON, not prose)
 
 Schemas: `schemas/*.schema.json`. Tool: `scripts/contracts.py`.

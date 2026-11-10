@@ -64,11 +64,10 @@
             "pattern": "^[A-Za-z0-9]+$"
           },
           "duration_s": {
-            "enum": [
-              5,
-              10,
-              15
-            ]
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 15,
+            "description": "decided from the script via duration.py; never a default"
           },
           "chain_from": {
             "type": [

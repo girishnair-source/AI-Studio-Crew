@@ -19,23 +19,28 @@ Anything else            → escalate after the cap.
 import argparse, json, os, re, sys, time, concurrent.futures as cf
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "camera-roll", "scripts")); sys.path.insert(0, os.path.join(HERE, "..", "..", "dailies-qc", "scripts")); sys.path.insert(0, HERE)
-from camera_roll import roll, RollError, last_frame  # noqa: E402
+from camera_roll import roll, RollError, last_frame, CONFIG as CR_CONFIG  # noqa: E402
+CONFIG_CAP = CR_CONFIG["max_clip_seconds"]
 from dailies_qc import speech, contact  # noqa: E402
 import telemetry  # noqa: E402
 
 POLICY_MAX_AUTO_RETAKES = 2  # hard ceiling; CallSheet may lower, never raise
 
-def auto_fix(prompt, reason, attempt, dur):
+def auto_fix(prompt, reason, attempt, dur, cap=None):
+    """Returns (new_prompt, new_duration_s, note). Clipped speech is first fixed by GIVING THE SHOT MORE TIME (the script
+    decides length, not a constant); only at the cap do we ask for a tighter read."""
+    cap = cap or CONFIG_CAP
     if reason == "speech-clipped-at-end":
-        if attempt == 1: return prompt + f"\nTiming: all speech must finish by {dur-1.5:.1f} seconds; hold on the listener's face for the remaining time.", "finish-early hint"
-        return prompt + f"\nTiming: speak about 10 percent slower but finish by {dur-2.0:.1f} seconds; the final clause may be shortened by one or two words.", "slower + finish-early"
+        if dur + 2 <= cap: return prompt, dur + 2, f"duration {dur}s → {dur+2}s (speech needs room)"
+        if attempt == 1: return prompt + f"\nTiming: all speech must finish by {dur-1.5:.1f} seconds; hold on the listener's face after.", dur, "finish-early hint (at cap)"
+        return prompt + f"\nTiming: speak about 10 percent slower but finish by {dur-2.0:.1f} seconds; the final clause may be shortened by one or two words.", dur, "slower + finish-early (at cap)"
     if reason == "monotone-read":
-        return prompt + "\nPerformance: this is a performance, not a read. Vary pitch and pace sentence to sentence: one quiet sentence, one punched word, one held pause. Speak to one person.", "performance push"
+        return prompt + "\nPerformance: this is a performance, not a read. Vary pitch and pace sentence to sentence: one quiet sentence, one punched word, one held pause. Speak to one person.", dur, "performance push"
     if reason == "audio-peaks-hot":
-        return prompt + "\nAudio: softer, closer voice; no shouting; peaks well below clipping.", "softer voice"
+        return prompt + "\nAudio: softer, closer voice; no shouting; peaks well below clipping.", dur, "softer voice"
     if reason == "speech-starts-at-zero":
-        return prompt + "\nTiming: half a second of silence before the first word.", "head handle"
-    return None, None
+        return (prompt + "\nTiming: half a second of silence before the first word.", dur + 1 if dur + 1 <= cap else dur, "head handle")
+    return None, dur, None
 
 def qc_take(path, profile):
     q = speech(path, profile=profile)
@@ -60,7 +65,7 @@ def escalate(scene_dir, scene, shot, takes, reason, evidence, parent):
     return p, esc
 
 def run_shot(s, scene, scene_dir, max_auto, budget, parent):
-    shot = s["id"]; dur = float(s["duration"].rstrip("s")); profile = s.get("profile", "dialogue")
+    shot = s["id"]; dur = int(round(float(str(s["duration"]).rstrip("s")))); profile = s.get("profile", "dialogue")
     prompt = s["prompt"]; images = list(s.get("images", [])); evidence = []; takes = 0; best = None
     with telemetry.span("shot", parent, agent="camera", scene=scene, shot=shot) as sp:
         while True:
@@ -70,7 +75,7 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent):
             out = os.path.join(scene_dir, f"{shot}_take{takes}.mp4")
             try:
                 with telemetry.span("camera.roll", sp, agent="camera", scene=scene, shot=shot, take=takes) as rs:
-                    res = roll(prompt, out, task=s.get("task", "text_to_video"), duration=s["duration"], aspect=s.get("aspect", "9:16"), resolution=s.get("resolution", "720p"), images=images, shot_id=f"{scene}/{shot}/t{takes}")
+                    res = roll(prompt, out, task=s.get("task", "text_to_video"), duration=f"{dur}s", aspect=s.get("aspect", "9:16"), resolution=s.get("resolution", "720p"), images=images, shot_id=f"{scene}/{shot}/t{takes}")
                     telemetry.record_tokens(rs, gen_tokens=res.get("gen_tokens", 0), llm_in=res.get("llm_in", 0), llm_out=res.get("llm_out", 0))
             except RollError as e:
                 evidence.append(f"take{takes}: {e.kind}: {str(e)[:120]}")
@@ -90,10 +95,10 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent):
                 return {"shot": shot, "status": "ok", "take": out, "takes": takes, "qc": q}
             if takes - 1 >= max_auto:
                 p, esc = escalate(scene_dir, scene, shot, takes, flags[0], evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best, "takes": takes}
-            new_prompt, fix = auto_fix(prompt, flags[0], takes, dur)
+            new_prompt, new_dur, fix = auto_fix(prompt, flags[0], takes, dur)
             if not new_prompt:
                 p, esc = escalate(scene_dir, scene, shot, takes, flags[0], evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best, "takes": takes}
-            prompt = new_prompt; evidence.append(f"auto-fix {takes}: {fix}")
+            prompt, dur = new_prompt, new_dur; evidence.append(f"auto-fix {takes}: {fix}")
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
@@ -119,7 +124,6 @@ def main():
     causes = {}
     for r in results:
         if r["status"] == "escalate": causes[json.load(open(r["escalation"]))["reason_code"]] = causes.get(json.load(open(r["escalation"]))["reason_code"], 0) + 1
-    usable = sum(float(json.load(open(a.manifest))[0]["duration"].rstrip("s")) for _ in [0]) * 0  # placeholder; Editor computes true usable seconds
     summary = {"schema": "SceneSummary/1", "scene": a.scene, "locked_at": time.strftime("%F %T"), "locked_takes": locked, "rolls": budget["rolls"], "retakes": retakes,
                "retake_causes": causes, "escalations": [r["escalation"] for r in results if r["status"] == "escalate"], "usable_seconds": sum(r["qc"].get("trim_to") or 0 for r in results if r["status"] == "ok"),
                "one_line": f"{len(locked)}/{len(shots)} shots locked, {budget['rolls']} rolls, {len(causes)} escalation type(s)"}

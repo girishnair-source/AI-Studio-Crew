@@ -12,7 +12,7 @@ Script: `scripts/camera_roll.py` (python3, stdlib + ffmpeg).
 ```bash
 CR=<plugin>/skills/camera-roll/scripts/camera_roll.py
 python3 $CR doctor                                     # auth + lanes reachability
-python3 $CR roll --id 4A --prompt "$P" --duration 15s --aspect 9:16 --resolution 720p \
+python3 $CR roll --id 4A --prompt "$P" --duration 7s --aspect 9:16 --resolution 720p   # 7s came from duration.py, not a default \
         --image production/bible/characters/rishi/front.png --out production/dailies/EP01_SC04/4A_take1.mp4
 python3 $CR batch --manifest shots.json --parallel 6   # all independent shots at once
 python3 $CR last-frame --video 4A_take1.mp4 --out 4A_take1_last.png   # for CHAIN shots
@@ -24,7 +24,7 @@ Output: one JSON line per shot with `status` ∈ `ok | safety | capacity | auth 
 ## Rules the crew follows
 
 1. **Config lives in one place.** Model IDs, hosts, projects, clip cap, lanes → `CONFIG` at the top of the script (env overrides: `AGY_LANE`, `AGY_FALLBACK_LANE`, `AGY_PROJECT`, `AGY_ACCESS_TOKEN`, `AGY_PRODUCTION_DIR`). Codenames get renamed at launch; nothing else may hardcode them.
-2. **Clip cap** is `CONFIG.max_clip_seconds` (15). Dialogue budget ≈ 2.6 words/s → ~38 words per 15s at 100% rate. Longer beats are **chained**: roll part N, `last-frame`, bind it as the first `--image` for part N+1 and say "exact continuation of the reference image" in the prompt. (`extend` task exists but refuses speech — don't use it for dialogue.)
+2. **Duration is per shot, from the script.** `CONFIG.min/max_clip_seconds` (3–15 s on Omni 1.2 Flash) are the model's bounds; the number for each shot comes from `studio-protocol/scripts/duration.py` via the DOP's ShotList. `--duration` is required on every roll — there is no default. Beats longer than the bound are **chained**: roll part N, `last-frame`, bind it as the first `--image` for part N+1 and say "exact continuation of the reference image" in the prompt. (`extend` task exists but refuses speech — don't use it for dialogue.)
 3. **Prompt compile order** (Camera agent): character lock paragraph(s) quoted from `bible/.../notes.md` → voice lock from `bible/voices/<name>/voice.md` → shot block (shot-grammar) → Style line → Audio line.
 4. **Reference binding:** `front.png` for anyone speaking or facing camera. Back-view-only refs cause face drift (the model invents a face). Multiple images allowed; first is strongest.
 5. **Status handling:**

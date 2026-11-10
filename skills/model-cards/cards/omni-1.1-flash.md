@@ -14,8 +14,8 @@
 ## Capabilities
 | Capability | Status | Notes |
 |---|---|---|
-| Interactions API `video_config.task` | ✅ accepted (probe "created!" 2026-10-31) | same request shape as Omni 1.5 |
-| Durations / resolutions | ❓ not probed — assume ≤ Omni 1.5; run the probe below before relying on 15 s | |
+| Interactions API `video_config.task` | ✅ accepted (probe "created!" 2026-10-31) | same request shape as Omni 1.2 Flash |
+| Durations / resolutions | ❓ not probed — assume ≤ Omni 1.2 Flash; run the probe below before relying on 15 s | |
 | Multimodal video-to-video, reference video/audio conditioning | 📄 per Conclave deck | **unverified** |
 | Extend clips to 30 s | 📄 per deck | **unverified**; likely same speech-edit refusal as 1.5 |
 | Upscale 360p/720p → 1080p/4K | 📄 per deck | unverified |

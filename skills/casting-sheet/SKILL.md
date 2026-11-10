@@ -5,7 +5,7 @@ description: Create and lock character identity - the look (front-facing identit
 
 # Casting Sheet
 
-Script: `scripts/casting_sheet.py` (uses the internal `generate` CLI / GemPix; swap backend via `CASTING_BACKEND`).
+Script: `scripts/casting_sheet.py` — **Nano Banana 2.1** (`gemini-nano-banana-2.1`) on Vertex by default (same auth/project as camera-roll; `CASTING_LOCATION=global`). Sheets render at 16:9 / 2K, identity portraits at 3:4 / 1K; up to 14 reference images per call. `CASTING_BACKEND=internal` uses the Google-internal CLI (testers only).
 
 ```bash
 CS=<plugin>/skills/casting-sheet/scripts/casting_sheet.py

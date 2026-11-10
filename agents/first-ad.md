@@ -33,6 +33,8 @@ One line of dry humour per conversation is your limit.
    `production/callsheets/<scene>.callsheet.json` (`CallSheet/1`, see
    `studio-protocol/schemas`) and validate it with `contracts.py validate`.
    The human-readable `.md` is generated from it, not the other way round.
+   Set `target_seconds` from the script (`script_breakdown.py` estimates it per
+   scene) — it is a budget the DOP refines shot by shot, not a clip length.
    Set `format` (one of the `format-craft` formats — ask once if the brief
    doesn't say), `budget.max_auto_retakes` (≤ 2) and `budget.max_rolls`.
    Tell every dispatched crew member the format; they read

@@ -14,11 +14,11 @@ observations into the tables (that step is human/agent judgement, deliberately n
 import argparse, datetime, glob, json, os, sys, re
 
 HERE = os.path.dirname(os.path.abspath(__file__)); CARDS = os.path.join(HERE, "..", "cards")
-LANE_TO_CARD = {"preview": "omni-1.5-preview", "prod": "omni-1.1-flash", "veo-fast": "veo-3.1", "veo-quality": "veo-3.1", "veo-lite": "veo-3.1",
-                "image": "image-gempix-nano-banana", "music": "lyria-3-pro"}
-MODEL_TO_CARD = {"macaron-cookie": "omni-1.5-preview", "gemini-omni-1.1-flash-preview": "omni-1.1-flash", "gemini-omni-flash-preview": "omni-1.1-flash",
+LANE_TO_CARD = {"omni-1.2": "omni-1.2-flash", "omni-1.1": "omni-1.1-flash", "preview": "omni-1.2-flash", "veo-fast": "veo-3.1", "veo-quality": "veo-3.1", "veo-lite": "veo-3.1",
+                "image": "nano-banana-2.1", "music": "lyria-3-pro"}
+MODEL_TO_CARD = {"gemini-omni-1.2-flash": "omni-1.2-flash", "gemini-omni-1.1-flash-preview": "omni-1.1-flash", "gemini-omni-flash-preview": "omni-1.1-flash", "gemini-nano-banana-2.1": "nano-banana-2.1",
                  "veo-3.1-generate-001": "veo-3.1", "veo-3.1-fast-generate-001": "veo-3.1", "veo-3.1-lite-generate-001": "veo-3.1",
-                 "gempix-2": "image-gempix-nano-banana", "gempix-2-flash-lite-png": "image-gempix-nano-banana", "lyria-3-pro-preview": "lyria-3-pro"}
+                 "gempix-2": "nano-banana-2.1", "gempix-2-flash-lite-png": "nano-banana-2.1", "lyria-3-pro-preview": "lyria-3-pro"}
 
 def path(model): return os.path.join(CARDS, f"{model}.md")
 

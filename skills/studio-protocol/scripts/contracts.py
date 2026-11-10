@@ -61,12 +61,18 @@ def check(obj, t):
     if t == "ShotList" and not errs:
         ids = [s["id"] for s in obj["shots"]]
         if len(ids) != len(set(ids)): errs.append("$.shots: duplicate ids")
+        try:
+            sys.path.insert(0, HERE); import duration as dur_mod
+        except Exception: dur_mod = None
         for s in obj["shots"]:
             if s.get("chain_from") and s["chain_from"] not in ids: errs.append(f"$.shots[{s['id']}].chain_from: unknown shot {s['chain_from']}")
+            lines = [d["line"] for d in s.get("dialogue", [])]
             for d in s.get("dialogue", []):
-                words = len(re.sub(r"\[[^\]]*\]", "", d["line"]).split())
-                if words > 2 * s["duration_s"]: errs.append(f"$.shots[{s['id']}]: {words} words for {s['duration_s']}s (max {2*s['duration_s']}; split the line)")
                 if not re.search(r"\[[a-z ]+\]|\*[^*]+\*|\.\.\.", d["line"]): errs.append(f"$.shots[{s['id']}]: dialogue has no performance tags — DOP must direct the read")
+            if dur_mod:
+                est = dur_mod.estimate(lines, s.get("action", ""), s.get("profile", "dialogue"))
+                if not est["fits"]: errs.append(f"$.shots[{s['id']}]: speech needs {est['speech_s']}s > cap — split the line (duration.py plan)")
+                elif s["duration_s"] < est["duration_s"]: errs.append(f"$.shots[{s['id']}]: duration_s {s['duration_s']} < {est['duration_s']} needed by the script (speech {est['speech_s']}s + head/tail) — set from duration.py, do not guess")
     if t == "CallSheet" and not errs and obj["budget"]["max_auto_retakes"] > 2:
         errs.append("$.budget.max_auto_retakes: policy cap is 2")
     if t == "ShotList" and not errs:
@@ -90,7 +96,7 @@ SKELETONS = {
                "dispatch": [{"step": 1, "agent": "script-supervisor", "deliverable": "bible-check", "output": "production/dailies/EP01_SC04/bible_check.json"}],
                "budget": {"max_auto_retakes": 2, "max_rolls": 12}, "decisions": []},
  "ShotList": {"schema": "ShotList/1", "scene": "EP01_SC04", "format": "micro-drama", "aspect": "9:16", "resolution": "720p", "style": "", "audio": "",
-              "shots": [{"id": "4A", "duration_s": 15, "chain_from": None, "camera": "", "direction": "", "action": "", "characters": ["rishi"], "refs": ["production/bible/characters/rishi/front.png"], "profile": "dialogue",
+              "shots": [{"id": "4A", "duration_s": 6, "chain_from": None, "camera": "", "direction": "", "action": "", "characters": ["rishi"], "refs": ["production/bible/characters/rishi/front.png"], "profile": "dialogue",
                          "dialogue": [{"speaker": "caller", "language": "hi", "intention": "", "line": "[slow] ... *word*"}]}]},
  "CrewReport": {"schema": "CrewReport/1", "agent": "camera", "scene": "EP01_SC04", "status": "ok", "artifacts": [], "notes": [], "requests": []},
  "Escalation": {"schema": "Escalation/1", "scene": "EP01_SC04", "shot": "4A", "takes_tried": 3, "auto_retakes_used": 2, "reason_code": "speech-clipped-at-end", "reason": "",

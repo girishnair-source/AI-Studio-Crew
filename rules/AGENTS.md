@@ -95,9 +95,13 @@ production/
 
 ## Model & tool conventions
 
-- Video/dialogue: Interactions API (see `camera-roll` skill). Model IDs and
-  hosts live in **one config block** (`camera_roll.py` → `CONFIG`); never
-  hardcode them elsewhere. Codenames will be renamed at launch.
+- Video/dialogue: Gemini Omni 1.2 Flash via the Interactions API (see
+  `camera-roll`). Images: Nano Banana 2.1 on Vertex (`casting-sheet`). Music:
+  Lyria 3 Pro. Model IDs and hosts live in **one config block**
+  (`camera_roll.py` → `CONFIG`); never hardcode them elsewhere; no codenames.
+- **Clip durations are never hard-coded.** Each shot's length is computed from
+  its words and action beats (`duration.py`) by the DOP; model bounds (3–15 s)
+  are limits, not defaults.
 - Images/sheets: `casting-sheet` skill. Music: `composer-cue`. SFX: `sound-sfx`.
 - Never write scratch files into a Google3/CitC workspace. Scratch goes under
   the production folder's `.scratch/`.

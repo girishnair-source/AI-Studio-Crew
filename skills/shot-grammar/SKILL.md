@@ -26,7 +26,7 @@ Audio: <diegetic sounds, score yes/no, dialogue notes — one line>.
 ## Rules
 
 1. **Declare count and duration up front** ("15 seconds, four shots with hard cuts").
-2. **3–5 s per shot.** Under 3 s turns to mush; over 6 s becomes a long take.
+2. **Length comes from the content.** Silent action beats run 3–5 s each; dialogue shots run exactly as long as the words need (`duration.py`): a one-line reply can be 3 s, a speech is split across chained shots. Never a fixed clip length.
 3. **One action beat per shot** and one camera idea. "Rapid zooms, kinetic camera work, anamorphic flares" in one sentence = the model guesses.
 4. **Camera is concrete:** "low tracking shot inches above the road, cars pass left to right", "chase-cam locked behind the rear bumper", "whip-pan right to…". Not "dynamic".
 5. **Screen direction every time** (left→right, toward camera, away). It's what makes cuts read.
@@ -53,7 +53,7 @@ Rules:
 2. **One intention line per part** — what the character wants in this moment. It does more than ten adjectives.
 3. **Inline tags, sparingly:** `[pause]` `[beat]` `[slower]` `[quicker]` `[whisper]` `[smile]` `[cold]` `[warm]` `[breath]` `[rising]` `[falling]` `[trailing off]` `[hard stop]`, `*word*` for emphasis, `...` for a hold. 2–4 tags per sentence; more becomes noise.
 4. **Vary the shape on purpose.** If three sentences in a row have the same tag pattern, rewrite one. A good read has a quiet sentence, a punched word, and a hold.
-5. **≤ 30 words per 15s clip.** Room for breath and pauses is what makes it sound human.
+5. **Words set the seconds, not the other way round.** `duration.py estimate` gives the clip its length (≈2.4 words/s + pauses + 1.4 s head/tail). If it exceeds the model bound, split at a natural pause — never speed the read.
 6. **Talking to one person.** Add "speaking to one person across a table, not reading" for presenters and narrators — it kills the teleprompter cadence.
 7. Never describe the voice in the direction ("deep baritone") — that is Casting's fingerprint; repeating it differently *causes* drift.
 8. If a read comes back flat, the fix is stronger intention + fewer words, not a higher speech rate.
