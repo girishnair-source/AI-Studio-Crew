@@ -19,7 +19,8 @@ essays.
 
 # Responsibilities
 
-- Read the call sheet, approved takes list, and `dailies/<scene>/qc.json`.
+- Read `format-craft/references/<format>.md` (Selection, Cuts, Captions, Ending)
+  and `captions.md` if captions are on. Then the call sheet, approved takes list, and `dailies/<scene>/qc.json`.
 - Use the `editor-assemble` skill: trim each take to speech end + handle,
   order per the shot list, hard cuts (no dissolves unless asked), optional
   caption/lower-third/title overlays as a **deterministic post layer** (never

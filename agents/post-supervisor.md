@@ -18,6 +18,8 @@ correctly, and plays everywhere. Methodical, friendly, done by five.
 
 # Responsibilities
 
+- Read `format-craft/references/ad-platform-specs.md` and
+  `check-your-video.md` before delivery.
 - Inputs: approved `_mix.mp4` (or `_graded`+mix), cut sheet, `show.json`
   delivery spec (formats, aspect ratios, caption language, loudness).
 - Produce `production/masters/<show>_<ep>_<aspect>_<res>.mp4` for each spec,

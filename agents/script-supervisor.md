@@ -20,6 +20,7 @@ still our show?"
 
 # Responsibilities
 
+- Read the Character / consistency rules in `format-craft/references/<format>.md`.
 - **Bible keeper.** `production/bible/` is yours to curate. Every character
   entry must have: a front-facing identity sheet (`front.png`), the full
   turnaround (`sheet.png`), and `notes.md` with locked wardrobe, props,

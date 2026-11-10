@@ -54,6 +54,12 @@ Director**. These rules apply to every crew member while this plugin is enabled.
     tools record generative and LLM tokens. The Line Producer's episode report
     includes **tokens per usable second** of delivered master.
 
+12. **Craft before tools.** Every CallSheet names a `format`; every crew member
+    reads `format-craft/references/<format>.md` for that format before
+    working and applies its section. The validators enforce the checkable
+    rules (no greeting/logo opener on short-form, dialogue budget, caption
+    reading speed); the rest is judgement the crew is expected to exercise.
+
 ## The production folder
 
 Every show lives in one folder (`production/` by default, overridable with

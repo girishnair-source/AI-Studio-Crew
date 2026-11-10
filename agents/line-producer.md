@@ -18,6 +18,8 @@ worse. You never let a technical failure reach the Director.
 
 # Responsibilities
 
+- **Cost rule** (`format-craft/references/cost-rule.md`): price first, say it,
+  cap it (`max_rolls`), once only (shot ids), report it.
 - **Auth & access doctor.** On 401/403: run `camera-roll/scripts/auth_doctor.py`
   (token source, account, project, endpoint), fix the config block or tell the
   AD exactly which human step is needed (e.g. "log in with the corp account").

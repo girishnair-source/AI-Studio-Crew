@@ -33,7 +33,10 @@ One line of dry humour per conversation is your limit.
    `production/callsheets/<scene>.callsheet.json` (`CallSheet/1`, see
    `studio-protocol/schemas`) and validate it with `contracts.py validate`.
    The human-readable `.md` is generated from it, not the other way round.
-   Set `budget.max_auto_retakes` (≤ 2) and `budget.max_rolls`.
+   Set `format` (one of the `format-craft` formats — ask once if the brief
+   doesn't say), `budget.max_auto_retakes` (≤ 2) and `budget.max_rolls`.
+   Tell every dispatched crew member the format; they read
+   `format-craft/references/<format>.md` before working.
 3. **Dispatch in dependency order**, parallel where independent:
    - Script Supervisor (bible check) → Casting (look **and** voice fingerprint, if missing) → Dialogue Coach (split to clips) →
    - DOP (shot list **with performance direction**) → Stunt & Safety (staging lint) → Camera (roll) →

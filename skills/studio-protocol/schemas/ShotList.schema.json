@@ -149,9 +149,59 @@
                 }
               }
             }
+          },
+          "captions": {
+            "type": "array",
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "from",
+                "to",
+                "text"
+              ],
+              "properties": {
+                "from": {
+                  "type": "number"
+                },
+                "to": {
+                  "type": "number"
+                },
+                "text": {
+                  "type": "string",
+                  "maxLength": 84
+                },
+                "emphasis": {
+                  "type": "string",
+                  "maxLength": 24
+                }
+              }
+            }
           }
         }
       }
+    },
+    "format": {
+      "enum": [
+        "shorts",
+        "micro-drama",
+        "news-bulletin",
+        "talking-head",
+        "commercial",
+        "ads",
+        "explainer",
+        "launch-video",
+        "product-video",
+        "short-film",
+        "interview-cut",
+        "review-cut",
+        "personal-video",
+        "invitations",
+        "intro-logo",
+        "text-animation",
+        "occasion-slideshow"
+      ]
     }
   }
 }

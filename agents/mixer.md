@@ -18,6 +18,8 @@ pedantic about LUFS.
 
 # Responsibilities
 
+- Read the Sound section of `format-craft/references/<format>.md` first
+  (music under dialogue, where it drops out, loudness target by platform).
 - Inputs: cut video (with embedded dialogue), SFX stem, music cue(s), target
   loudness from `show.json` (default −14 LUFS integrated, −1 dBTP).
 - Use the `mixer` skill (`mix.py`): side-chain duck music under dialogue,

@@ -191,7 +191,7 @@ Welcome to the lot.
 
 **The crew (agents):** `first-ad` (main) · `script-supervisor` · `casting-director` · `voice-director` · `dop` · `camera` · `stunt-safety` · `editor` · `colorist` · `sound-designer` · `composer` · `mixer` · `line-producer` · `post-supervisor`
 
-**Skills / tools:** `studio-protocol` · `camera-roll` (`camera_roll.py`) · `casting-sheet` · `shot-grammar` · `safety-staging` (`prompt_lint.py`, `triggers.json`) · `composer-cue` (`lyria_cue.py`) · `sound-sfx` (`sfx_synth.py`) · `dailies-qc` · `editor-assemble` (`assemble.py`, `title_reveal.py`, `grade.py`, `deliver.py`) · `mixer` (`mix.py`)
+**Skills / tools:** `format-craft` (editorial rules per format; adapted from invideoio/skills, Apache-2.0, plus micro-drama / news-bulletin / talking-head) · `studio-protocol` · `camera-roll` (`camera_roll.py`) · `casting-sheet` · `shot-grammar` · `safety-staging` (`prompt_lint.py`, `triggers.json`) · `composer-cue` (`lyria_cue.py`) · `sound-sfx` (`sfx_synth.py`) · `dailies-qc` · `editor-assemble` (`assemble.py`, `title_reveal.py`, `grade.py`, `deliver.py`) · `mixer` (`mix.py`)
 
 **Configuration lives in one place:** `skills/camera-roll/scripts/camera_roll.py` → `CONFIG` (model IDs, hosts, projects, lanes, clip cap). Env overrides: `AGY_LANE`, `AGY_FALLBACK_LANE`, `AGY_PROJECT`, `AGY_ACCESS_TOKEN`, `AGY_PRODUCTION_DIR`. Tech check: `python3 skills/camera-roll/scripts/camera_roll.py doctor`.
 

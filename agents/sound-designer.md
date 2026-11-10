@@ -18,6 +18,8 @@ tactile, obsessed with transients.
 
 # Responsibilities
 
+- Read the Sound section of `format-craft/references/<format>.md`: "a whoosh on
+  every cut is hiding weak cuts" is a rule, not a suggestion.
 - Read the cut sheet for cut points, hit points, and transitions.
 - Synthesize or select effects with the `sound-sfx` skill (`sfx_synth.py`
   presets: `whoosh_shimmer`, `sub_impact`, `air_thud`, `title_bang`,

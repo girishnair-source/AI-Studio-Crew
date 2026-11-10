@@ -69,14 +69,27 @@ def check(obj, t):
                 if not re.search(r"\[[a-z ]+\]|\*[^*]+\*|\.\.\.", d["line"]): errs.append(f"$.shots[{s['id']}]: dialogue has no performance tags — DOP must direct the read")
     if t == "CallSheet" and not errs and obj["budget"]["max_auto_retakes"] > 2:
         errs.append("$.budget.max_auto_retakes: policy cap is 2")
+    if t == "ShotList" and not errs:
+        fmt = obj.get("format")
+        first = obj["shots"][0]
+        opener = (first.get("action", "") + " " + " ".join(d["line"] for d in first.get("dialogue", []))).lower()
+        if fmt in ("shorts", "talking-head", "micro-drama", "ads", "commercial") and re.search(r"\b(hi|hello|hey|welcome|namaste|namaskar|today we|in this video|my name is)\b", opener):
+            errs.append("$.shots[0]: opens on a greeting/run-up — format-craft: open on the strongest line or image")
+        if fmt in ("shorts", "talking-head", "ads") and re.search(r"\blogo\b", first.get("action", "").lower()):
+            errs.append("$.shots[0]: opens on a logo — format-craft: never a logo first (intro-logo is its own format)")
+        for s in obj["shots"]:
+            for cap in s.get("captions", []):
+                dur = max(0.1, cap["to"] - cap["from"]); cps = len(cap["text"]) / dur
+                if cps > 20: errs.append(f"$.shots[{s['id']}].captions: {cps:.0f} chars/sec > 20 (format-craft/captions: ceiling, shorten or hold longer)")
+                if len(cap["text"].split("\n")) > 2: errs.append(f"$.shots[{s['id']}].captions: more than 2 lines")
     return errs
 
 SKELETONS = {
- "CallSheet": {"schema": "CallSheet/1", "scene": "EP01_SC04", "title": "", "brief": "", "aspect": "9:16", "target_seconds": 30, "mode": "dailies",
+ "CallSheet": {"schema": "CallSheet/1", "scene": "EP01_SC04", "title": "", "format": "micro-drama", "brief": "", "aspect": "9:16", "target_seconds": 30, "mode": "dailies",
                "characters": [{"name": "rishi", "look": True, "voice": True, "speaks": True}],
                "dispatch": [{"step": 1, "agent": "script-supervisor", "deliverable": "bible-check", "output": "production/dailies/EP01_SC04/bible_check.json"}],
                "budget": {"max_auto_retakes": 2, "max_rolls": 12}, "decisions": []},
- "ShotList": {"schema": "ShotList/1", "scene": "EP01_SC04", "aspect": "9:16", "resolution": "720p", "style": "", "audio": "",
+ "ShotList": {"schema": "ShotList/1", "scene": "EP01_SC04", "format": "micro-drama", "aspect": "9:16", "resolution": "720p", "style": "", "audio": "",
               "shots": [{"id": "4A", "duration_s": 15, "chain_from": None, "camera": "", "direction": "", "action": "", "characters": ["rishi"], "refs": ["production/bible/characters/rishi/front.png"], "profile": "dialogue",
                          "dialogue": [{"speaker": "caller", "language": "hi", "intention": "", "line": "[slow] ... *word*"}]}]},
  "CrewReport": {"schema": "CrewReport/1", "agent": "camera", "scene": "EP01_SC04", "status": "ok", "artifacts": [], "notes": [], "requests": []},
