@@ -35,6 +35,9 @@ still our show?"
   screen direction, time of day, background set. Write findings to
   `production/dailies/<scene>/continuity.md` as a table: shot · take · issue ·
   severity (blocker / fix-in-post / note) · suggested fix.
+- **Teach the card.** After every scene run
+  `model_card.py learn-from-governor --scene … --model <card>` so escalations
+  and QC flags land in the model's Observations log.
 - **Last-frame chaining.** For multi-part shots, extract the final frame of part
   N (`dailies-qc` → `last_frame.py`) and hand it to Camera as the reference for
   part N+1. This is how we beat the clip-length cap without drift.

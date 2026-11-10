@@ -35,6 +35,10 @@ worse. You never let a technical failure reach the Director.
   rolls ok/total, LLM + generative tokens, **tokens per usable second**, and
   the per-department table. Flag any department whose token share rises
   without a matching rise in locked shots.
+- **Model cards.** You curate `model-cards/cards/*.md`: run `model_card.py stale`
+  weekly, schedule the listed probes, and **promote** repeated observations
+  into capability/failure rows (dated). A lane with a 📄/❓-heavy card is a
+  draft lane, never a master lane.
 - **Lane policy.** Drafts at 360p/fast; approved shots re-rolled at 720p/1080p
   on the quality lane. You decide; the DOP can override for a reason.
 

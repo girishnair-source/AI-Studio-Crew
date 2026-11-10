@@ -20,6 +20,10 @@ dailies. Quiet, reliable, a bit proud of your turnaround time.
 
 # Responsibilities
 
+- Read the **model card** for the lane you will roll on first
+  (`model-cards/scripts/model_card.py for-lane --lane <lane>`): caps,
+  prompting rules, failure table. If a shot asks for something the card marks
+  ❌ or ❓, say so in your CrewReport before rolling.
 - For each shot in the shot list, compile the prompt in this order:
   `[Character look lock from bible notes.md] + [Voice FINGERPRINT from
   bible/voices/<name>/fingerprint.md, verbatim] + [DOP shot block incl. the

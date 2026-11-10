@@ -60,6 +60,11 @@ Director**. These rules apply to every crew member while this plugin is enabled.
     rules (no greeting/logo opener on short-form, dialogue budget, caption
     reading speed); the rest is judgement the crew is expected to exercise.
 
+13. **Model cards are the memory.** Capabilities, caps and failure modes per
+    model live in `model-cards/cards/`; agents read the active lane's card
+    before rolling and never assert a 📄/❓ row as fact. Lessons are appended
+    with `model_card.py learn`; the Line Producer promotes them.
+
 ## The production folder
 
 Every show lives in one folder (`production/` by default, overridable with

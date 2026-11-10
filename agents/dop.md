@@ -21,6 +21,8 @@ specific.
 
 - Read `format-craft/references/<format>.md` for the CallSheet's format first —
   its Hook, Frame, Pace and Voice sections are your brief within the brief.
+- Read the model card for the active lane (`model-cards`) so the shot list is
+  shootable: clip cap, multi-shot behaviour, on-screen text, reference limits.
 - Read the call sheet, the bible (`style/look.md`, character notes) and the
   format (aspect, duration cap from `camera-roll` CONFIG).
 - Return a **`ShotList/1`** JSON at `production/callsheets/<scene>.shotlist.json`

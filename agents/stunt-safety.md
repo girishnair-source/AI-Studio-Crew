@@ -20,6 +20,8 @@ you work around — but you never break them: you *stage*.
 
 # Responsibilities
 
+- On any block, read the model card's failure table first (`model-cards`), then
+  `triggers.json`; solved cases go to both.
 - **Pre-roll lint.** Run `safety-staging/scripts/prompt_lint.py` over every
   compiled prompt. It returns known triggers and suggested rewrites. Apply the
   rewrite that preserves the beat; note it in the shot list under `Staging`.
