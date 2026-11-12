@@ -111,12 +111,32 @@ def save(sig, out, mp3=False):
         subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", out, "-c:a", "libmp3lame", "-b:a", "320k", os.path.splitext(out)[0] + ".mp3"], check=True)
     return out
 
+def _parse_tc(tc, fps=24.0):
+    h, m, s, f = [int(x) for x in tc.split(":")]
+    return h * 3600 + m * 60 + s + f / fps
+
+def cues_from_edl(edl_path, fps=24.0, preset="air_thud", dissolve_preset="whoosh_shimmer", room_tone_gain=0.0):
+    import re
+    cues, max_t = [], 0.0
+    with open(edl_path, encoding="utf-8") as f:
+        for ln in f:
+            m = re.match(r"^\d+\s+\S+\s+\S+\s+([CD])\s+\d{2}:\d{2}:\d{2}:\d{2}\s+\d{2}:\d{2}:\d{2}:\d{2}\s+(\d{2}:\d{2}:\d{2}:\d{2})\s+(\d{2}:\d{2}:\d{2}:\d{2})", ln.strip())
+            if not m: continue
+            tr, rec_in, rec_out = m.group(1), _parse_tc(m.group(2), fps), _parse_tc(m.group(3), fps)
+            max_t = max(max_t, rec_out)
+            if rec_in > 0.2:
+                cues.append({"t": round(max(0.0, rec_in - 0.15), 2), "preset": dissolve_preset if tr == "D" else preset, "gain": 0.45 if tr == "C" else 0.65})
+    if room_tone_gain > 0 and max_t > 0:
+        cues.insert(0, {"t": 0.0, "preset": "room_tone", "dur": round(max_t, 2), "gain": room_tone_gain})
+    return cues, round(max_t, 2)
+
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
     m = sub.add_parser("make"); m.add_argument("--preset", required=True, choices=PRESETS); m.add_argument("--out", required=True); m.add_argument("--dur", type=float); m.add_argument("--intensity", type=float, default=1.0); m.add_argument("--mp3", action="store_true")
     b = sub.add_parser("bank"); b.add_argument("--out-dir", required=True); b.add_argument("--mp3", action="store_true")
     s = sub.add_parser("stem"); s.add_argument("--cues", required=True); s.add_argument("--len", type=float, required=True); s.add_argument("--out", required=True)
+    fe = sub.add_parser("from-edl"); fe.add_argument("--edl", required=True); fe.add_argument("--out-cues", required=True); fe.add_argument("--out-stem"); fe.add_argument("--fps", type=float, default=24.0); fe.add_argument("--preset", default="air_thud", choices=PRESETS); fe.add_argument("--room-tone", type=float, default=0.0)
     a = ap.parse_args()
     if a.cmd == "list":
         for k in PRESETS: print(k)
@@ -126,6 +146,17 @@ def main():
         print(save(PRESETS[a.preset](**kw), a.out, a.mp3))
     elif a.cmd == "bank":
         for k, f in PRESETS.items(): print(save(f(), os.path.join(a.out_dir, f"{k}.wav"), a.mp3))
+    elif a.cmd == "from-edl":
+        cues, length = cues_from_edl(a.edl, fps=a.fps, preset=a.preset, room_tone_gain=a.room_tone)
+        os.makedirs(os.path.dirname(os.path.abspath(a.out_cues)), exist_ok=True)
+        with open(a.out_cues, "w") as f: json.dump(cues, f, indent=2)
+        if a.out_stem and length > 0:
+            total = np.zeros(int(SR * length), dtype=np.float32)
+            for c in cues:
+                sig = PRESETS[c["preset"]](**({"k": c.get("gain", 1.0)} | ({"dur": c["dur"]} if "dur" in c else {})))
+                i = int(c["t"] * SR); j = min(len(total), i + len(sig)); total[i:j] += sig[: j - i]
+            save(_norm(total, .9), a.out_stem)
+        print(json.dumps({"cues": a.out_cues, "count": len(cues), "length": length, "stem": a.out_stem}))
     elif a.cmd == "stem":
         total = np.zeros(int(SR * a.len), dtype=np.float32)
         for c in json.load(open(a.cues)):

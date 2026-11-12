@@ -14,7 +14,8 @@ CR=<plugin>/skills/camera-roll/scripts/camera_roll.py
 python3 $CR doctor                                     # auth + lanes reachability
 python3 $CR roll --id 4A --prompt "$P" --duration 7s --aspect 9:16 --resolution 720p   # 7s came from duration.py, not a default \
         --image production/bible/characters/rishi/front.png --out production/dailies/EP01_SC04/4A_take1.mp4
-python3 $CR batch --manifest shots.json --parallel 6   # all independent shots at once
+python3 $CR batch --manifest shots.json --parallel 6 [--draft]   # all independent shots at once (--draft forces 360p)
+python3 $CR promote --summary production/dailies/EP01_SC04/scene_summary.json --resolution 1080p [--method upscale|reroll]
 python3 $CR last-frame --video 4A_take1.mp4 --out 4A_take1_last.png   # for CHAIN shots
 ```
 
@@ -32,8 +33,8 @@ Output: one JSON line per shot with `status` ∈ `ok | safety | capacity | auth 
    - `capacity` / `timeout` → the script already backed off and tried the fallback lane; if it still fails, Line Producer decides (wait / lane / lower res).
    - `auth` / `access` → Line Producer runs `doctor`. 401 = token; 403 = account/project (common on laptops where gcloud is logged into a non-corp account).
    - `request` → the prompt/params are wrong (unsupported duration/resolution/task); fix, don't retry.
-6. **Drafts vs finals.** Drafts at `360p`/`720p` on the default lane; approved shots re-rolled at `resolution_final` from `show.json` only if the draft is approved (Line Producer policy).
-7. Every roll appends to `production/reports/ledger.csv` automatically.
+6. **Drafts vs finals.** Drafts at `360p` (`batch --draft`) or `veo-3.1-fast`/`veo-3.1-lite`; approved shots promoted to `resolution_final` (`1080p`/`4k`) via `camera_roll.py promote` (upscale or hero reroll).
+7. Every roll appends to `production/reports/ledger.csv` automatically (including `gen_tokens`).
 
 ## Voice consistency
 

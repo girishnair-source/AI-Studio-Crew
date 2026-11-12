@@ -147,14 +147,43 @@ def compile_manifest(shotlist, bible, out_dir, scene):
                     "images": refs, "out": os.path.join(out_dir, f"{s['id']}_take1.mp4"), "profile": s.get("profile", "dialogue"), "chain_from": s.get("chain_from")})
     return man
 
+def compile_cut(shotlist, summary, out_cut_path):
+    """ShotList + SceneSummary -> cut.json for assemble.py."""
+    aspect = shotlist.get("aspect", "9:16")
+    W, H = (1080, 1920) if aspect == "9:16" else ((1080, 1080) if aspect == "1:1" else (1920, 1080))
+    by_shot = {t["shot"]: t for t in summary.get("locked_takes", [])}
+    out_dir = os.path.dirname(os.path.abspath(out_cut_path))
+    clips = []
+    for s in shotlist["shots"]:
+        t = by_shot.get(s["id"])
+        if not t:
+            continue
+        src_rel = os.path.relpath(os.path.abspath(t["take"]), out_dir)
+        clip = {"src": src_rel, "in": 0, "out": "speech" if t.get("trim_to") else s["duration_s"], "transition": s.get("transition", "cut")}
+        if s.get("captions"):
+            clip["captions"] = s["captions"]
+        clips.append(clip)
+    return {"fps": 24, "width": W, "height": H, "clips": clips}
+
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     v = sub.add_parser("validate"); v.add_argument("--type", required=True, choices=TYPES); v.add_argument("--file")
     n = sub.add_parser("new"); n.add_argument("--type", required=True, choices=TYPES)
     s = sub.add_parser("summarize"); s.add_argument("--type", required=True, choices=TYPES); s.add_argument("--file")
     c = sub.add_parser("shotlist-to-manifest"); c.add_argument("--shotlist", required=True); c.add_argument("--bible", default="production/bible"); c.add_argument("--out", required=True); c.add_argument("--dailies-dir")
+    sc = sub.add_parser("shotlist-to-cut"); sc.add_argument("--shotlist", required=True); sc.add_argument("--summary", required=True); sc.add_argument("--out", required=True)
     a = ap.parse_args()
     if a.cmd == "new": print(json.dumps(SKELETONS[a.type], indent=2, ensure_ascii=False)); return
+    if a.cmd == "shotlist-to-cut":
+        sl = json.load(open(a.shotlist)); summ = json.load(open(a.summary))
+        errs = check(sl, "ShotList")
+        if errs:
+            for e in errs: print(json.dumps({"error": e}), file=sys.stderr)
+            sys.exit(1)
+        cut = compile_cut(sl, summ, a.out)
+        os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
+        json.dump(cut, open(a.out, "w"), indent=2, ensure_ascii=False)
+        print(f"cut: {a.out} ({len(cut['clips'])} clips)"); return
     obj = json.load(open(a.file)) if getattr(a, "file", None) else (json.load(open(a.shotlist)) if a.cmd == "shotlist-to-manifest" else json.load(sys.stdin))
     t = a.type if a.cmd != "shotlist-to-manifest" else "ShotList"
     errs = check(obj, t)

@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "camera-roll", "scripts")); sys.path.insert(0, os.path.join(HERE, "..", "..", "dailies-qc", "scripts")); sys.path.insert(0, HERE)
 from camera_roll import roll, RollError, last_frame, CONFIG as CR_CONFIG  # noqa: E402
 CONFIG_CAP = CR_CONFIG["max_clip_seconds"]
-from dailies_qc import speech, contact  # noqa: E402
+from dailies_qc import full_qc  # noqa: E402
 import telemetry  # noqa: E402
 
 POLICY_MAX_AUTO_RETAKES = 2  # hard ceiling; CallSheet may lower, never raise
@@ -40,13 +40,22 @@ def auto_fix(prompt, reason, attempt, dur, cap=None):
         return prompt + "\nAudio: softer, closer voice; no shouting; peaks well below clipping.", dur, "softer voice"
     if reason == "speech-starts-at-zero":
         return (prompt + "\nTiming: half a second of silence before the first word.", dur + 1 if dur + 1 <= cap else dur, "head handle")
+    if reason == "dialogue-mismatch":
+        return prompt + "\nDialogue clarity: articulate every word cleanly and verbatim as scripted; no ad-libbing, no dropped words.", dur, "verbatim dialogue emphasis"
+    if reason == "hallucinated-speech":
+        return prompt + "\nAudio: silent performance, no spoken words or background chatter.", dur, "suppress hallucinated speech"
+    if reason in ("face-drift", "continuity-drift"):
+        return prompt + "\nContinuity: match the primary reference image's exact face, hair, wardrobe, and lighting across every frame.", dur, "reinforce reference lock"
+    if reason == "unprompted-captions":
+        return prompt + "\nVisual: clean frame with NO burned-in captions, NO subtitles, and NO on-screen text.", dur, "suppress unprompted captions"
+    if reason in ("visual-artifacts", "action-mismatch"):
+        return prompt + "\nStaging: keep camera motion smooth and simple; execute one clear physical beat with natural anatomy.", dur, "simplify staging"
+    if reason in ("frozen-video", "black-frames"):
+        return prompt + "\nMotion: continuous subtle natural movement and steady lighting from the first frame to the last.", dur, "ensure continuous motion"
     return None, dur, None
 
-def qc_take(path, profile):
-    q = speech(path, profile=profile)
-    try: contact(path)
-    except Exception: pass
-    return q
+def qc_take(path, profile, expected_text="", refs=(), action="", no_llm=False):
+    return full_qc(path, profile=profile, expected_text=expected_text, refs=refs, action=action, no_llm=no_llm)
 
 def escalate(scene_dir, scene, shot, takes, reason, evidence, parent):
     opts = {
@@ -54,6 +63,10 @@ def escalate(scene_dir, scene, shot, takes, reason, evidence, parent):
         "monotone-read": ([("A", "Have the DOP re-direct the line with stronger intention and fewer words", "+1 roll"), ("B", "Accept the best take", "flat read stays")], "A"),
         "safety": ([("A", "Use Stunt & Safety's restaging of this beat", "+1 roll, beat preserved"), ("B", "Drop this shot from the scene", "no roll")], "A"),
         "capacity": ([("A", "Wait and retry in 10 minutes", "no cost"), ("B", "Roll on the fallback lane at lower resolution", "quality trade")], "A"),
+        "dialogue-mismatch": ([("A", "Simplify or split the line with Voice Director", "+1 roll, clean lip-sync"), ("B", "Accept the best take and fix in captions/ADR", "minor wording drift")], "A"),
+        "face-drift": ([("A", "Refresh/lock front-facing reference via Casting and re-roll", "+1 roll, locks identity"), ("B", "Accept the best take", "visible drift stays")], "A"),
+        "continuity-drift": ([("A", "Re-roll anchored on previous shot's last frame", "+1 roll"), ("B", "Accept the best take and match in Colorist grade", "props/wardrobe may differ")], "A"),
+        "visual-artifacts": ([("A", "Have DOP simplify camera motion and action beat", "+1 roll"), ("B", "Accept the best take", "artifact remains")], "A"),
     }.get(reason, ([("A", "Retake once more with a human note", "+1 roll"), ("B", "Accept the best take", "")], "B"))
     esc = {"schema": "Escalation/1", "scene": scene, "shot": shot, "takes_tried": takes, "auto_retakes_used": max(0, takes - 1), "reason_code": reason,
            "reason": f"{reason} persisted after {takes} take(s)", "at": time.strftime("%F %T"), "evidence": evidence[-4:],
@@ -64,9 +77,13 @@ def escalate(scene_dir, scene, shot, takes, reason, evidence, parent):
     telemetry._write({"event": "escalation", "trace_id": parent["trace_id"], "span_id": parent["span_id"], "name": "escalate", "ts_ns": time.time_ns(), "attributes": {"scene": scene, "shot": shot, "reason": reason}})
     return p, esc
 
-def run_shot(s, scene, scene_dir, max_auto, budget, parent):
+def run_shot(s, scene, scene_dir, max_auto, budget, parent, no_llm_qc=False):
     shot = s["id"]; dur = int(round(float(str(s["duration"]).rstrip("s")))); profile = s.get("profile", "dialogue")
     prompt = s["prompt"]; images = list(s.get("images", [])); evidence = []; takes = 0; best = None
+    exp_dlg = s.get("dialogue") or ""
+    if isinstance(exp_dlg, list):
+        exp_dlg = " ".join(x.get("line", "") for x in exp_dlg)
+    action = s.get("action", "")
     with telemetry.span("shot", parent, agent="camera", scene=scene, shot=shot) as sp:
         while True:
             if budget["rolls"] >= budget["max_rolls"]:
@@ -84,7 +101,7 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent):
                     p, esc = escalate(scene_dir, scene, shot, takes, reason, evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best}
                 continue
             with telemetry.span("qc", sp, agent="dailies-qc", scene=scene, shot=shot, take=takes):
-                q = qc_take(out, profile)
+                q = qc_take(out, profile, expected_text=exp_dlg, refs=images, action=action, no_llm=no_llm_qc)
             try: last_frame(out, out.replace(".mp4", "_last.png"))
             except Exception: pass
             flags = [f for f in q.get("flags", []) if f != "no-speech" or s.get("dialogue")]
@@ -103,7 +120,7 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent):
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run"); r.add_argument("--manifest", required=True); r.add_argument("--scene", required=True); r.add_argument("--max-auto-retakes", type=int, default=POLICY_MAX_AUTO_RETAKES)
-    r.add_argument("--max-rolls", type=int, default=12); r.add_argument("--parallel", type=int, default=6); r.add_argument("--production", default=os.environ.get("AGY_PRODUCTION_DIR", "production"))
+    r.add_argument("--max-rolls", type=int, default=12); r.add_argument("--parallel", type=int, default=6); r.add_argument("--production", default=os.environ.get("AGY_PRODUCTION_DIR", "production")); r.add_argument("--no-llm-qc", action="store_true")
     a = ap.parse_args()
     max_auto = min(a.max_auto_retakes, POLICY_MAX_AUTO_RETAKES)
     shots = json.load(open(a.manifest)); scene_dir = os.path.join(a.production, "dailies", a.scene); os.makedirs(scene_dir, exist_ok=True)
@@ -115,7 +132,7 @@ def main():
         ready = [s for s in pending if not s.get("chain_from") or s["chain_from"] in done]
         if not ready: break
         with cf.ThreadPoolExecutor(max_workers=a.parallel) as ex:
-            for s, res in zip(ready, ex.map(lambda s: run_shot(s, a.scene, scene_dir, max_auto, budget, parent), ready)):
+            for s, res in zip(ready, ex.map(lambda s: run_shot(s, a.scene, scene_dir, max_auto, budget, parent, no_llm_qc=a.no_llm_qc), ready)):
                 done[s["id"]] = res; results.append(res); pending.remove(s)
     for s in pending:  # parents escalated → children blocked
         results.append({"shot": s["id"], "status": "blocked", "reason": f"chain parent {s['chain_from']} not locked"})

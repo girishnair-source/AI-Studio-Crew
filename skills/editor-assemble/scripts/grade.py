@@ -9,22 +9,30 @@ exposure in EV (±1), temp in -100..100 (neg = cooler), grain 0..20.
 """
 import argparse, json, subprocess, sys
 
+LOOK_PRESETS = {
+    "thriller_35mm": {"exposure": -0.05, "temp": -14, "sat": 0.88, "contrast": 1.12, "gamma": 0.95, "grain": 6},
+    "warm_cinema": {"exposure": 0.02, "temp": 14, "sat": 1.06, "contrast": 1.06, "gamma": 0.98, "grain": 3},
+    "crisp_social": {"exposure": 0.04, "temp": 4, "sat": 1.10, "contrast": 1.08, "gamma": 1.0, "grain": 0},
+    "noir": {"exposure": -0.08, "temp": -8, "sat": 0.15, "contrast": 1.25, "gamma": 0.92, "grain": 8},
+}
+
 def stats_full(p):
     import re
-    o = subprocess.run(["ffmpeg", "-loglevel", "info", "-i", p, "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG:key=lavfi.signalstats.YLOW:key=lavfi.signalstats.YHIGH:key=lavfi.signalstats.UAVG:key=lavfi.signalstats.VAVG", "-f", "null", "-"], capture_output=True, text=True).stderr
+    o = subprocess.run(["ffmpeg", "-loglevel", "info", "-i", p, "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG:key=lavfi.signalstats.YLOW:key=lavfi.signalstats.YHIGH:key=lavfi.signalstats.UAVG:key=lavfi.signalstats.VAVG:key=lavfi.signalstats.SATAVG", "-f", "null", "-"], capture_output=True, text=True).stderr
     g = lambda k: [float(x) for x in re.findall(rf"{k}=([\d.]+)", o)]
     m = lambda v, d: sum(v) / len(v) if v else d
-    return {"y": m(g("YAVG"), 128), "ylow": m(g("YLOW"), 16), "yhigh": m(g("YHIGH"), 235), "u": m(g("UAVG"), 128), "v": m(g("VAVG"), 128)}
+    return {"y": m(g("YAVG"), 128), "ylow": m(g("YLOW"), 16), "yhigh": m(g("YHIGH"), 235), "u": m(g("UAVG"), 128), "v": m(g("VAVG"), 128), "sat": m(g("SATAVG"), 40)}
 
 def match_to_hero(clip, hero, out):
     h, c = stats_full(hero), stats_full(clip)
-    # contrast first: map clip's low/high to hero's; then midtone (gamma); then balance (temp from V/U drift)
+    # contrast first: map clip's low/high to hero's; then midtone (gamma); then balance (temp from V/U drift) & sat
     span_c = max(1.0, c["yhigh"] - c["ylow"]); span_h = max(1.0, h["yhigh"] - h["ylow"])
-    contrast = max(0.7, min(1.4, span_h / span_c)); exposure = (h["y"] - c["y"]) / 40.0
-    gamma = max(0.8, min(1.25, 1 + (h["y"] - c["y"]) / 255.0))
-    temp = (h["v"] - c["v"]) * 2 - (h["u"] - c["u"]) * 2
-    vf = build_vf(exposure=exposure, temp=temp, contrast=contrast, gamma=gamma)
-    run(clip, out, vf); return {"clip": clip, "exposure_ev": round(exposure, 2), "contrast": round(contrast, 2), "gamma": round(gamma, 2), "temp": round(temp, 1)}
+    contrast = max(0.75, min(1.35, span_h / span_c)); exposure = max(-0.8, min(0.8, (h["y"] - c["y"]) / 40.0))
+    gamma = max(0.82, min(1.22, 1 + (h["y"] - c["y"]) / 255.0))
+    temp = max(-40.0, min(40.0, (h["v"] - c["v"]) * 2 - (h["u"] - c["u"]) * 2))
+    sat = max(0.75, min(1.25, h["sat"] / max(5.0, c["sat"])))
+    vf = build_vf(exposure=exposure, temp=temp, sat=sat, contrast=contrast, gamma=gamma)
+    run(clip, out, vf); return {"clip": clip, "exposure_ev": round(exposure, 2), "contrast": round(contrast, 2), "gamma": round(gamma, 2), "temp": round(temp, 1), "sat": round(sat, 2)}
 
 def stats(p):
     o = subprocess.run(["ffmpeg", "-loglevel", "info", "-i", p, "-vf", "signalstats,metadata=print:key=lavfi.signalstats.YAVG:key=lavfi.signalstats.UAVG:key=lavfi.signalstats.VAVG", "-f", "null", "-"], capture_output=True, text=True).stderr
@@ -57,8 +65,9 @@ def main():
         run(a.inp, a.out, build_vf(exposure=exposure, temp=temp)); return
     ap = argparse.ArgumentParser(); ap.add_argument("--in", dest="inp", required=True); ap.add_argument("--out", required=True)
     for k, d in (("exposure", 0.0), ("temp", 0.0), ("sat", 1.0), ("contrast", 1.0), ("gamma", 1.0), ("grain", 0.0)): ap.add_argument(f"--{k}", type=float, default=d)
-    ap.add_argument("--lut"); a = ap.parse_args()
-    run(a.inp, a.out, build_vf(a.exposure, a.temp, a.sat, a.contrast, a.gamma, a.lut, int(a.grain)))
+    ap.add_argument("--lut"); ap.add_argument("--preset", choices=list(LOOK_PRESETS)); a = ap.parse_args()
+    p = LOOK_PRESETS.get(a.preset, {})
+    run(a.inp, a.out, build_vf(p.get("exposure", a.exposure), p.get("temp", a.temp), p.get("sat", a.sat), p.get("contrast", a.contrast), p.get("gamma", a.gamma), a.lut, int(p.get("grain", a.grain))))
 
 if __name__ == "__main__":
     main()

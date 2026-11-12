@@ -9,10 +9,13 @@ Script: `scripts/dailies_qc.py` (ffmpeg/ffprobe).
 
 ```bash
 QC=<plugin>/skills/dailies-qc/scripts/dailies_qc.py
-python3 $QC scene   --dir production/dailies/EP01_SC04          # everything: contacts, last frames, qc.json
-python3 $QC contact --video 4A_take1.mp4 --frames 5              # then read_file the PNG to *look*
-python3 $QC speech  --video 4A_take1.mp4 --profile presenter    # {"speech_end": 14.6, "margin": 0.4, "f0_std_semitones": 3.4, "monotone": true, ...}
-python3 $QC last    --video 4A_take1.mp4                         # 4A_take1_last.png for CHAIN shots
+python3 $QC scene   --dir production/dailies/EP01_SC04 [--manifest shots.json] # contacts, last frames, audio + ASR + visual QC -> qc.json
+python3 $QC full    --video 4A_take1.mp4 --expected "..." --ref front.png      # full audio + ASR + visual continuity check
+python3 $QC asr     --video 4A_take1.mp4 --expected "..."                      # ASR word-accuracy critic (WER, missing/extra words)
+python3 $QC visual  --video 4A_take1.mp4 --ref front.png --action "..."        # visual continuity, face drift, captions, artifacts
+python3 $QC contact --video 4A_take1.mp4 --frames 5                            # then read_file the PNG to *look*
+python3 $QC speech  --video 4A_take1.mp4 --profile presenter                   # {"speech_end": 14.6, "margin": 0.4, "f0_std_semitones": 3.4, "monotone": true, ...}
+python3 $QC last    --video 4A_take1.mp4                                       # 4A_take1_last.png for CHAIN shots
 ```
 
 ## What each crew member looks for
@@ -38,5 +41,5 @@ Calibration from our own dailies: influencer presenter clips 3.4–3.9 st (flagg
 ## Rules
 
 - Never `read_file` an `.mp4`. Contact sheets and envelopes are the eyes and ears.
-- QC is **measurement, not transcription**. Word accuracy needs an ASR pass (Mixer skill, when configured) or a human ear — say so in reports.
+- `asr` and `visual` use Gemini Flash (`AGY_QC_MODEL`, default `gemini-2.5-flash`) via Vertex; pass `--no-llm` (or `--no-llm-qc` to `retake_governor.py`) for offline audio/ffmpeg-only QC.
 - Write findings to `dailies/<scene>/continuity.md` (Script Sup) and keep `qc.json` machine-readable for the Editor.
