@@ -79,7 +79,11 @@ details.prov pre { white-space:pre-wrap; word-break:break-word; color:#cbd5e1; b
 .sb-frame { position:relative; width:100%; background:#090b0e; display:flex; align-items:center; justify-content:center; overflow:hidden; }
 .sb-frame.ar-9x16 { aspect-ratio:16/10; }
 .sb-frame.ar-16x9 { aspect-ratio:16/9; }
-.sb-frame img { width:100%; height:100%; object-fit:cover; }
+.sb-frame img, .sb-frame video { width:100%; height:100%; object-fit:cover; }
+.vid-player { width:100%; max-height:460px; background:#000; display:block; }
+.strip-details { padding:6px 14px; font-size:11px; color:var(--muted); border-bottom:1px solid var(--border); }
+.strip-details summary { cursor:pointer; }
+.strip-details img { width:100%; border-radius:4px; margin-top:6px; }
 .sb-placeholder { padding:20px; text-align:center; color:var(--muted); font-size:12px; border:1px dashed #334155; margin:14px; border-radius:8px; width:calc(100% - 28px); }
 .sb-cam-overlay { position:absolute; bottom:8px; left:8px; right:8px; background:rgba(9,11,14,0.82); backdrop-filter:blur(4px); padding:4px 8px; border-radius:6px; font-size:11px; color:#cbd5e1; border:1px solid rgba(255,255,255,0.1); }
 .sb-body { padding:12px 14px; display:grid; gap:8px; font-size:13px; flex:1; }
@@ -99,6 +103,15 @@ def _img_uri(path, out_html, embed=False):
         mt = "image/png" if path.lower().endswith(".png") else "image/jpeg"
         with open(path, "rb") as f:
             return f"data:{mt};base64," + base64.b64encode(f.read()).decode()
+    return os.path.relpath(os.path.abspath(path), os.path.dirname(os.path.abspath(out_html)))
+
+
+def _media_uri(path, out_html, embed_video=False):
+    if not path or not os.path.exists(path):
+        return ""
+    if embed_video:
+        with open(path, "rb") as f:
+            return "data:video/mp4;base64," + base64.b64encode(f.read()).decode()
     return os.path.relpath(os.path.abspath(path), os.path.dirname(os.path.abspath(out_html)))
 
 
@@ -324,17 +337,25 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
                     f"{_style_inline_tags(d['line'])}</div>"
                 )
 
-            frame_inner = (
-                f"<img src='{uri}' alt='Shot {H.escape(sid)}'/>"
-                if uri
-                else f"<div class='sb-placeholder'><strong>{H.escape(sl.get('aspect','9:16'))} Frame</strong><br>{H.escape(s.get('camera',''))}</div>"
-            )
+            # Prefer inline <video> if a rolled take exists for this shot!
+            vid_candidates = sorted(glob.glob(os.path.join(sc_dailies, f"{sid}_take*.mp4")))
+            vid_uri = _media_uri(vid_candidates[-1], out_html) if vid_candidates else ""
+            poster_attr = f" poster='{uri}'" if uri else ""
+            if vid_uri:
+                frame_inner = f"<video controls playsinline preload='metadata'{poster_attr} src='{vid_uri}'></video>"
+                cam_overlay = ""
+            elif uri:
+                frame_inner = f"<img src='{uri}' alt='Shot {H.escape(sid)}'/>"
+                cam_overlay = f"<div class='sb-cam-overlay'>🎥 {H.escape(s.get('camera',''))}</div>"
+            else:
+                frame_inner = f"<div class='sb-placeholder'><strong>{H.escape(sl.get('aspect','9:16'))} Frame</strong><br>{H.escape(s.get('camera',''))}</div>"
+                cam_overlay = f"<div class='sb-cam-overlay'>🎥 {H.escape(s.get('camera',''))}</div>"
             cards.append(
                 f"<div class='sb-card{' tp' if tp else ''}{init_cls}' data-shot='{H.escape(target_key)}'>"
                 f"<div class='sb-hdr'><strong>Shot {H.escape(sid)}</strong><div>{' '.join(badges)}</div></div>"
-                f"<div class='sb-frame {ar_cls}'>{frame_inner}"
-                f"<div class='sb-cam-overlay'>🎥 {H.escape(s.get('camera',''))}</div></div>"
+                f"<div class='sb-frame {ar_cls}'>{frame_inner}{cam_overlay}</div>"
                 f"<div class='sb-body'>"
+                f"<div style='font-size:11px;color:var(--muted)'>🎥 {H.escape(s.get('camera',''))}</div>"
                 f"<div>{H.escape(s.get('action',''))}</div>{eb_html}{dlg_html}"
                 f"{_prov_drawer(prompt_txt, model_lbl, refs_list, comp.get('characters', ()), stale_msg=stale_msg)}"
                 f"{_note_widget(target_key, existing_notes)}"
@@ -354,9 +375,107 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
     return "".join(sections)
 
 
+def render_dailies_section(production_dir, episode, out_html, existing_notes=None, embed=False, embed_video=False):
+    """Render all rolled video takes across scenes for `episode` with inline HTML5 <video> playback."""
+    dailies_root = os.path.join(production_dir, "dailies")
+    scene_dirs = sorted(glob.glob(os.path.join(dailies_root, f"{episode}*")))
+    if not scene_dirs and os.path.isdir(dailies_root):
+        scene_dirs = sorted(d for d in glob.glob(os.path.join(dailies_root, "*")) if os.path.isdir(d))
+    sections = []
+    for sdir in scene_dirs:
+        sc_name = os.path.basename(sdir)
+        qc_p = os.path.join(sdir, "qc.json")
+        qc = json.load(open(qc_p, encoding="utf-8")) if os.path.exists(qc_p) else {}
+        mp4s = sorted(glob.glob(os.path.join(sdir, "*.mp4")))
+        if not mp4s:
+            continue
+        cards = []
+        for vp in mp4s:
+            vname = os.path.basename(vp)
+            sid = re.sub(r"_take\d+\.mp4$", "", vname)
+            target_key = f"{sc_name}/{sid}"
+            info = qc.get(vname, {})
+            cur_note = (existing_notes or {}).get(target_key, {})
+            init_cls = " approved" if cur_note.get("status") == "approved" else (" flagged" if cur_note.get("status") == "revise" else "")
+            cpath = info.get("contact") or os.path.join(sdir, os.path.splitext(vname)[0] + "_contact.png")
+            poster_uri = _img_uri(cpath, out_html, embed=embed)
+            vid_uri = _media_uri(vp, out_html, embed_video=embed_video)
+            poster_attr = f" poster='{poster_uri}'" if poster_uri else ""
+
+            flags = info.get("flags") or []
+            badges = [f"<span class='badge b-red'>{H.escape(fl)}</span>" for fl in flags] or ["<span class='badge b-green'>CLEAN</span>"]
+            if info.get("duration"):
+                badges.insert(0, f"<span class='badge b-blue'>{info['duration']}s</span>")
+
+            meta_bits = []
+            if info.get("margin") is not None:
+                meta_bits.append(f"margin={info['margin']}s")
+            if info.get("f0_std_semitones") is not None:
+                meta_bits.append(f"f0={info['f0_std_semitones']}")
+            if info.get("asr", {}).get("wer") is not None:
+                meta_bits.append(f"WER={info['asr']['wer']}")
+
+            pm = provenance.inspect_asset(vp, production_dir=production_dir) or {}
+            strip_html = (
+                f"<details class='strip-details'><summary>🎞 5-Frame Continuity Strip</summary><img src='{poster_uri}' alt='{H.escape(vname)}'/></details>"
+                if poster_uri
+                else ""
+            )
+            cards.append(
+                f"<div class='sb-card{init_cls}' data-shot='{H.escape(target_key)}'>"
+                f"<div class='sb-hdr'><strong>▶ {H.escape(vname)}</strong><div>{' '.join(badges)}</div></div>"
+                f"<video class='vid-player' controls playsinline preload='metadata'{poster_attr} src='{vid_uri}'></video>"
+                f"{strip_html}"
+                f"<div class='sb-body'>"
+                + (f"<div style='font-size:12px;color:var(--muted)'>{H.escape(' · '.join(meta_bits))}</div>" if meta_bits else "")
+                + (f"<div class='sb-dlg'>\"{H.escape(info.get('asr',{}).get('transcript',''))}\"</div>" if info.get("asr", {}).get("transcript") else "")
+                + (_prov_drawer(pm.get("prompt", ""), f"{pm.get('model','')} ({pm.get('lane','')})", pm.get("refs", ()), pm.get("characters", ())) if pm else "")
+                + f"{_note_widget(target_key, existing_notes)}"
+                f"</div>"
+                f"<div class='sb-actions'>"
+                f"<button class='btn btn-ok' onclick=\"sbVote('{H.escape(target_key)}','approved',this)\">✓ Approve Take</button>"
+                f"<button class='btn btn-flag' onclick=\"sbVote('{H.escape(target_key)}','revise',this)\">⚑ Retake</button>"
+                f"</div></div>"
+            )
+        sections.append(
+            f"<div style='margin-bottom:28px'><h2 style='margin:0 0 12px;font-size:16px'>🎬 {H.escape(sc_name)} · {len(mp4s)} take(s)</h2>"
+            f"<div class='sb-grid'>{''.join(cards)}</div></div>"
+        )
+    if not sections:
+        return "<div class='scene-card' style='color:var(--muted)'>No video takes rolled in <code>production/dailies/</code> yet. Once Camera rolls, playable takes appear here automatically.</div>"
+    return "".join(sections)
+
+
+def render_cuts_section(production_dir, episode, out_html, embed_video=False):
+    """Render assembled cuts and delivered masters with full HTML5 <video> playback."""
+    vids = []
+    for label, sub in (("Cut", "cuts"), ("Master", "masters")):
+        d = os.path.join(production_dir, sub)
+        for p in sorted(glob.glob(os.path.join(d, "*.mp4"))):
+            if episode.lower() in os.path.basename(p).lower() or not glob.glob(os.path.join(d, f"*{episode}*.mp4")):
+                vids.append((label, p))
+    if not vids:
+        return "<div class='scene-card' style='color:var(--muted)'>No assembled cuts or masters in <code>production/cuts/</code> or <code>production/masters/</code> yet.</div>"
+    cards = []
+    for label, vp in vids:
+        vname = os.path.basename(vp)
+        vid_uri = _media_uri(vp, out_html, embed_video=embed_video)
+        sz_mb = round(os.path.getsize(vp) / (1024 * 1024), 2)
+        cards.append(
+            f"<div class='sb-card'>"
+            f"<div class='sb-hdr'><strong>🎞 {H.escape(vname)}</strong><div><span class='badge b-purple'>{label}</span> <span class='badge b-blue'>{sz_mb} MB</span></div></div>"
+            f"<video class='vid-player' controls playsinline preload='metadata' src='{vid_uri}'></video>"
+            f"</div>"
+        )
+    return f"<div class='sb-grid'>{''.join(cards)}</div>"
+
+
 def _wrap_page(title, subtitle, body_html, tabs_html="", status_default="Add notes or votes — auto-applied on next roll", initial_notes=None):
     init_json = json.dumps(initial_notes or {})
     js = f"""
+document.addEventListener('play', function(e) {{
+  document.querySelectorAll('video').forEach(function(v) {{ if (v !== e.target) v.pause(); }});
+}}, true);
 const directorNotes = {init_json};
 function recordNote(target, comment) {{
   directorNotes[target] = directorNotes[target] || {{}};
@@ -395,6 +514,7 @@ async function persistNotes(silent) {{
   pill.textContent = 'Downloaded director_notes.json (place in production/callsheets/)';
 }}
 function showTab(id, btn) {{
+  document.querySelectorAll('video').forEach(v => v.pause());
   document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
   document.getElementById('pane-' + id).style.display = 'block';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -463,7 +583,7 @@ def build_storyboard_board(shotlist_paths, out_html, dailies_root=None, producti
     return out_html
 
 
-def build_hub(production_dir, episode="EP01", script_path=None, out_html=None, embed=False):
+def build_hub(production_dir, episode="EP01", script_path=None, out_html=None, embed=False, embed_video=False):
     cs_dir = os.path.join(production_dir, "callsheets")
     dailies_root = os.path.join(production_dir, "dailies")
     out_html = out_html or os.path.join(production_dir, f"{episode}_studio_hub.html")
@@ -493,15 +613,19 @@ def build_hub(production_dir, episode="EP01", script_path=None, out_html=None, e
 
     tabs = (
         "<div class='tabs'>"
-        "<button class='tab-btn active' onclick=\"showTab('script',this)\">1. Script Breakdown</button>"
+        "<button class='tab-btn active' onclick=\"showTab('script',this)\">1. Script</button>"
         "<button class='tab-btn' onclick=\"showTab('screenplay',this)\">2. Screenplay</button>"
-        "<button class='tab-btn' onclick=\"showTab('storyboard',this)\">3. Storyboard & Prompts</button>"
+        "<button class='tab-btn' onclick=\"showTab('storyboard',this)\">3. Storyboard</button>"
+        "<button class='tab-btn' onclick=\"showTab('dailies',this)\">4. Dailies (Video)</button>"
+        "<button class='tab-btn' onclick=\"showTab('cuts',this)\">5. Cuts & Masters</button>"
         "</div>"
     )
     body = (
         f"<div id='pane-script' class='tab-pane'>{render_script_section(bd, cs_map, notes)}</div>"
         f"<div id='pane-screenplay' class='tab-pane' style='display:none'>{render_screenplay_section(sp_txt, sls)}</div>"
         f"<div id='pane-storyboard' class='tab-pane' style='display:none'>{render_storyboard_section(sls, out_html, dailies_root=dailies_root, production_dir=production_dir, existing_notes=notes, embed=embed)}</div>"
+        f"<div id='pane-dailies' class='tab-pane' style='display:none'>{render_dailies_section(production_dir, episode, out_html, existing_notes=notes, embed=embed, embed_video=embed_video)}</div>"
+        f"<div id='pane-cuts' class='tab-pane' style='display:none'>{render_cuts_section(production_dir, episode, out_html, embed_video=embed_video)}</div>"
     )
     show_json = os.path.join(production_dir, "show.json")
     show_title = json.load(open(show_json, encoding="utf-8")).get("title", "AI Studio Crew") if os.path.exists(show_json) else "AI Studio Crew"
@@ -575,6 +699,7 @@ def main():
     p_hb.add_argument("--script")
     p_hb.add_argument("--out")
     p_hb.add_argument("--embed", action="store_true")
+    p_hb.add_argument("--embed-video", action="store_true")
 
     p_sv = sub.add_parser("serve")
     p_sv.add_argument("--production", default="production")
@@ -590,7 +715,7 @@ def main():
     elif a.cmd == "storyboard":
         print(build_storyboard_board(a.shotlist, a.out, dailies_root=a.dailies, embed=a.embed))
     elif a.cmd == "hub":
-        print(build_hub(a.production, episode=a.episode, script_path=a.script, out_html=a.out, embed=a.embed))
+        print(build_hub(a.production, episode=a.episode, script_path=a.script, out_html=a.out, embed=a.embed, embed_video=a.embed_video))
     elif a.cmd == "serve":
         serve_hub(a.production, episode=a.episode, script_path=a.script, port=a.port)
 

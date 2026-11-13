@@ -453,21 +453,32 @@ def scene(d, profile="dialogue", manifest=None, no_llm=False):
     return rep
 
 
-def build_board(scene_dir, out=None, embed=False):
-    """Generate a self-contained dark-mode HTML Dailies Review Board from qc.json."""
+def build_board(scene_dir, out=None, embed=False, embed_video=False):
+    """Generate a dark-mode HTML Dailies Review Board with inline HTML5 <video> playback + contact strips."""
     import html as _html
     qc_path = os.path.join(scene_dir, "qc.json")
     qc = json.load(open(qc_path)) if os.path.exists(qc_path) else {}
     out = out or os.path.join(scene_dir, "dailies_board.html")
+    out_dir = os.path.dirname(os.path.abspath(out))
     shots = {}
-    for name, info in sorted(qc.items()):
-        sid = re.sub(r"_take\d+\.mp4$", "", name)
-        shots.setdefault(sid, []).append((name, info))
+    # Include both qc.json entries and any .mp4 files in scene_dir even if qc.json wasn't run yet
+    all_mp4s = {os.path.basename(p) for p in glob.glob(os.path.join(scene_dir, "*.mp4"))}
+    for name in sorted(set(qc.keys()) | all_mp4s):
+        sid = re.sub(r"_take\d+\.mp4$", "", os.path.splitext(name)[0] if not name.endswith(".mp4") else name)
+        shots.setdefault(sid, []).append((name, qc.get(name, {})))
 
     cards = []
     for sid, takes in shots.items():
         take_html = []
         for name, info in takes:
+            vpath = os.path.join(scene_dir, name)
+            vid_src = ""
+            if os.path.exists(vpath):
+                if embed_video:
+                    with open(vpath, "rb") as vf:
+                        vid_src = "data:video/mp4;base64," + base64.b64encode(vf.read()).decode()
+                else:
+                    vid_src = os.path.relpath(os.path.abspath(vpath), out_dir)
             cpath = info.get("contact") or os.path.join(scene_dir, os.path.splitext(name)[0] + "_contact.png")
             img_src = ""
             if os.path.exists(cpath):
@@ -475,7 +486,7 @@ def build_board(scene_dir, out=None, embed=False):
                     with open(cpath, "rb") as f:
                         img_src = "data:image/png;base64," + base64.b64encode(f.read()).decode()
                 else:
-                    img_src = os.path.relpath(os.path.abspath(cpath), os.path.dirname(os.path.abspath(out)))
+                    img_src = os.path.relpath(os.path.abspath(cpath), out_dir)
             flags = info.get("flags") or []
             badges = "".join(f"<span class='flag'>{_html.escape(fl)}</span>" for fl in flags) or "<span class='ok'>CLEAN</span>"
             wer = info.get("asr", {}).get("wer")
@@ -497,23 +508,35 @@ def build_board(scene_dir, out=None, embed=False):
                     f"<div class='meta'>Refs: {_html.escape(refs_txt)} · Chars: {_html.escape(', '.join(pm.get('characters',[])) or '—')}</div>"
                     f"<pre>{_html.escape(pm.get('prompt',''))}</pre></details>"
                 )
+            poster_attr = f" poster='{img_src}'" if img_src else ""
+            player_html = (
+                f"<video class='vid' controls playsinline preload='metadata'{poster_attr} src='{vid_src}'></video>"
+                if vid_src
+                else ""
+            )
+            strip_html = (
+                f"<details class='strip'><summary>🎞 5-Frame Continuity Strip</summary><img src='{img_src}' alt='{_html.escape(name)}'/></details>"
+                if (img_src and vid_src)
+                else (f"<img src='{img_src}' alt='{_html.escape(name)}'/>" if img_src else "")
+            )
             take_html.append(
                 f"<div class='take' data-shot='{_html.escape(sid)}' data-take='{_html.escape(name)}'>"
-                f"<div class='th'><strong>{_html.escape(name)}</strong> {badges}</div>"
-                + (f"<img src='{img_src}' alt='{_html.escape(name)}'/>" if img_src else "")
+                f"<div class='th'><strong>▶ {_html.escape(name)}</strong> <div>{badges}</div></div>"
+                + player_html
+                + strip_html
                 + f"<div class='meta'>{_html.escape(meta)}</div>"
                 + (f"<div class='tr'>\"{_html.escape(tr)}\"</div>" if tr else "")
                 + prov_html
                 + f"<input class='note' placeholder='💬 Director note for {_html.escape(sid)}...' oninput=\"note('{_html.escape(sid)}',this.value)\"/>"
-                + f"<button onclick=\"pick('{_html.escape(sid)}','{_html.escape(name)}',this)\">Select Take</button></div>"
+                + f"<button onclick=\"pick('{_html.escape(sid)}','{_html.escape(name)}',this)\">✓ Select Take</button></div>"
             )
         cards.append(f"<section class='shot'><h2>Shot {_html.escape(sid)}</h2><div class='grid'>{''.join(take_html)}</div></section>")
 
     page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Dailies Board — {_html.escape(os.path.basename(os.path.abspath(scene_dir)))}</title>
-<style>body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:24px}}h1,h2{{margin:0 0 12px}}.bar{{position:sticky;top:0;background:#1b1b1b;padding:12px 16px;border:1px solid #333;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}}.shot{{margin-bottom:28px}}.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}}.take{{background:#1a1a1a;border:2px solid #2b2b2b;border-radius:8px;padding:12px}}.take.picked{{border-color:#22c55e}}.take img{{width:100%;border-radius:4px;margin:8px 0}}.th{{display:flex;justify-content:space-between;align-items:center}}.ok{{background:#14532d;color:#86efac;padding:2px 8px;border-radius:99px;font-size:12px}}.flag{{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:99px;font-size:12px;margin-left:4px}}.meta,.tr{{font-size:12px;color:#aaa;margin:4px 0}}details.prov{{background:#12151c;border:1px solid #2b3445;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:11px}}details.prov summary{{cursor:pointer;color:#93c5fd;font-weight:600}}details.prov pre{{white-space:pre-wrap;color:#cbd5e1;max-height:140px;overflow:auto;margin:6px 0 0}}.note{{width:100%;background:#0e1015;border:1px solid #333;color:#eee;padding:6px 8px;border-radius:5px;font-size:12px;margin-top:6px;box-sizing:border-box}}button{{margin-top:8px;background:#2563eb;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer}}</style></head>
-<body><div class="bar"><div><strong>Dailies Board</strong> · {_html.escape(scene_dir)}</div><code id="sel">No takes selected</code></div>
+<style>body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:24px}}h1,h2{{margin:0 0 12px}}.bar{{position:sticky;top:0;z-index:10;background:#1b1b1b;padding:12px 16px;border:1px solid #333;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}}.shot{{margin-bottom:28px}}.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px}}.take{{background:#1a1a1a;border:2px solid #2b2b2b;border-radius:8px;padding:12px}}.take.picked{{border-color:#22c55e}}.vid{{width:100%;max-height:460px;background:#000;border-radius:6px;margin:8px 0}}.take img{{width:100%;border-radius:4px;margin:6px 0}}.strip{{font-size:11px;color:#94a3b8;margin:4px 0}}.strip summary{{cursor:pointer}}.th{{display:flex;justify-content:space-between;align-items:center}}.ok{{background:#14532d;color:#86efac;padding:2px 8px;border-radius:99px;font-size:12px}}.flag{{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:99px;font-size:12px;margin-left:4px}}.meta,.tr{{font-size:12px;color:#aaa;margin:4px 0}}details.prov{{background:#12151c;border:1px solid #2b3445;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:11px}}details.prov summary{{cursor:pointer;color:#93c5fd;font-weight:600}}details.prov pre{{white-space:pre-wrap;color:#cbd5e1;max-height:140px;overflow:auto;margin:6px 0 0}}.note{{width:100%;background:#0e1015;border:1px solid #333;color:#eee;padding:6px 8px;border-radius:5px;font-size:12px;margin-top:6px;box-sizing:border-box}}button{{margin-top:8px;background:#2563eb;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:600}}</style></head>
+<body><div class="bar"><div><strong>🎬 Dailies Screening Room</strong> · {_html.escape(scene_dir)}</div><code id="sel">No takes selected</code></div>
 {''.join(cards)}
-<script>const picks={{}},notes={{}};function refresh(){{const p=Object.entries(picks).map(([k,v])=>k+'='+v).join(', ');const n=Object.entries(notes).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' | ');document.getElementById('sel').textContent=(p?'Approve: '+p:'')+(p&&n?' · ':'')+(n?'Notes: '+n:'')||'No takes selected';}}function pick(s,t,btn){{picks[s]=t;document.querySelectorAll(`.take[data-shot="${{s}}"]`).forEach(e=>e.classList.remove('picked'));btn.closest('.take').classList.add('picked');refresh();}}function note(s,v){{notes[s]=v;refresh();}}</script></body></html>"""
+<script>document.addEventListener('play',e=>{{document.querySelectorAll('video').forEach(v=>{{if(v!==e.target)v.pause();}});}},true);const picks={{}},notes={{}};function refresh(){{const p=Object.entries(picks).map(([k,v])=>k+'='+v).join(', ');const n=Object.entries(notes).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' | ');document.getElementById('sel').textContent=(p?'Approve: '+p:'')+(p&&n?' · ':'')+(n?'Notes: '+n:'')||'No takes selected';}}function pick(s,t,btn){{picks[s]=t;document.querySelectorAll(`.take[data-shot="${{s}}"]`).forEach(e=>e.classList.remove('picked'));btn.closest('.take').classList.add('picked');refresh();}}function note(s,v){{notes[s]=v;refresh();}}</script></body></html>"""
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
     return out
@@ -561,7 +584,8 @@ def main():
     b = sub.add_parser("board")
     b.add_argument("--dir", required=True)
     b.add_argument("--out")
-    b.add_argument("--embed", action="store_true", help="embed contact PNGs as base64 for single-file portability")
+    b.add_argument("--embed", action="store_true", help="embed contact PNGs as base64")
+    b.add_argument("--embed-video", action="store_true", help="embed MP4 videos as base64 for single-file portability")
 
     a = ap.parse_args()
     if a.cmd == "contact":
@@ -579,7 +603,7 @@ def main():
     elif a.cmd == "full":
         print(json.dumps(full_qc(a.video, profile=a.profile, expected_text=a.expected, refs=a.ref, action=a.action, no_llm=a.no_llm), indent=2, ensure_ascii=False))
     elif a.cmd == "board":
-        print(build_board(a.dir, out=a.out, embed=a.embed))
+        print(build_board(a.dir, out=a.out, embed=a.embed, embed_video=a.embed_video))
     else:
         scene(a.dir, a.profile, manifest=a.manifest, no_llm=a.no_llm)
 

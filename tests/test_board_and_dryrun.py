@@ -30,6 +30,7 @@ class TestBoardAndDryRun(unittest.TestCase):
                 html = f.read()
             self.assertIn("Shot 4A", html)
             self.assertIn("4A_take1.mp4", html)
+            self.assertIn("<video ", html)
 
             emb_board = dailies_qc.build_board(td, out=os.path.join(td, "emb.html"), embed=True)
             with open(emb_board, encoding="utf-8") as f:
@@ -69,7 +70,7 @@ class TestBoardAndDryRun(unittest.TestCase):
             sb_html = studio_board.build_storyboard_board([sl_p], os.path.join(td, "sb.html"))
             hub_html = studio_board.build_hub(td, episode="EP01", script_path=script_p)
 
-            for path, needle in ((sc_html, "Caller takes control"), (sp_html, "Objective:"), (sb_html, "Turning Point"), (hub_html, "Studio Hub")):
+            for path, needle in ((sc_html, "Caller takes control"), (sp_html, "Objective:"), (sb_html, "Turning Point"), (hub_html, "4. Dailies (Video)")):
                 self.assertTrue(os.path.exists(path))
                 with open(path, encoding="utf-8") as f:
                     self.assertIn(needle, f.read())
