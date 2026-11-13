@@ -60,27 +60,41 @@ SHEET_TMPL = ("Landscape 16:9. {style}. Character design sheet of {desc}. Turnar
               "close-ups: {expressions}. No text, no labels, no watermark.")
 DEFAULT_EXPR = "neutral, happy, angry, worried, surprised"
 
-def _gen(prompt, out, model, media=None, tries=4, aspect="1:1", size="1K"):
+def _gen(prompt, out, model, media=None, tries=4, aspect="1:1", size="1K", character=""):
     if BACKEND == "vertex" or not GEN or not os.path.exists(GEN):
-        return _vertex_image(prompt, out, aspect=aspect, size=size, media=[media] if media else None)
-    out = os.path.abspath(out)
-    for i in range(tries):
-        cmd = [GEN, "-prod", f"-output={out}", "image", f"-model={model}"]
-        if media: cmd.append(f"-media-uri={os.path.abspath(media)}")
-        cmd.append(prompt)
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if os.path.exists(out) and os.path.getsize(out) > 0:
-            return out
-        err = (r.stdout + r.stderr)
-        if "PREEMPTED" in err or "Overloaded" in err or "unavailable" in err:
-            time.sleep(6 + 6 * i); continue
-        if not err.strip():
-            # silent refusal: one retry on the other model, then give up
-            model = MODEL_PRO if model != MODEL_PRO else MODEL_FAST
-            if i >= 1: break
-            continue
-        print(err[-600:], file=sys.stderr); break
-    raise SystemExit("no image produced (soft refusal or capacity). Lint the description with safety-staging.")
+        res_out = _vertex_image(prompt, out, aspect=aspect, size=size, media=[media] if media else None)
+        used_model = NB_MODEL
+    else:
+        out = os.path.abspath(out)
+        res_out, used_model = None, model
+        for i in range(tries):
+            cmd = [GEN, "-prod", f"-output={out}", "image", f"-model={model}"]
+            if media: cmd.append(f"-media-uri={os.path.abspath(media)}")
+            cmd.append(prompt)
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if os.path.exists(out) and os.path.getsize(out) > 0:
+                res_out, used_model = out, model
+                break
+            err = (r.stdout + r.stderr)
+            if "PREEMPTED" in err or "Overloaded" in err or "unavailable" in err:
+                time.sleep(6 + 6 * i); continue
+            if not err.strip():
+                model = MODEL_PRO if model != MODEL_PRO else MODEL_FAST
+                if i >= 1: break
+                continue
+            print(err[-600:], file=sys.stderr); break
+        if not res_out:
+            raise SystemExit("no image produced (soft refusal or capacity). Lint the description with safety-staging.")
+    try:
+        proto_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "studio-protocol", "scripts"))
+        if proto_dir not in sys.path:
+            sys.path.insert(0, proto_dir)
+        import provenance  # noqa: E402
+        provenance.record(res_out, kind="image", prompt=prompt, model=used_model, lane=BACKEND, task="image_edit" if media else "character_sheet",
+                          params={"aspect": aspect, "size": size}, refs=[media] if media else (), characters=[character] if character else ())
+    except Exception:
+        pass
+    return res_out
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
@@ -95,9 +109,9 @@ def main():
     if a.cmd in ("front", "sheet"):
         os.makedirs(a.out_dir, exist_ok=True)
         if a.cmd == "front":
-            out = _gen(FRONT_TMPL.format(style=a.style, desc=a.desc), os.path.join(a.out_dir, "front.png"), a.model, aspect="3:4", size="1K")
+            out = _gen(FRONT_TMPL.format(style=a.style, desc=a.desc), os.path.join(a.out_dir, "front.png"), a.model, aspect="3:4", size="1K", character=a.name)
         else:
-            out = _gen(SHEET_TMPL.format(style=a.style, desc=a.desc, expressions=a.expressions), os.path.join(a.out_dir, "sheet.png"), a.model, aspect="16:9", size="2K")
+            out = _gen(SHEET_TMPL.format(style=a.style, desc=a.desc, expressions=a.expressions), os.path.join(a.out_dir, "sheet.png"), a.model, aspect="16:9", size="2K", character=a.name)
         notes = os.path.join(a.out_dir, "notes.md")
         if not os.path.exists(notes):
             open(notes, "w").write(f"# {a.name}\n\n## Lock (quote verbatim in prompts)\n{a.desc}\n\n## Style\n{a.style}\n\n## Signature details\n- \n\n## Known model pitfalls\n- \n")

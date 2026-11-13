@@ -68,6 +68,7 @@ def check(obj, t):
             if s.get("chain_from") and s["chain_from"] not in ids: errs.append(f"$.shots[{s['id']}].chain_from: unknown shot {s['chain_from']}")
             lines = [d["line"] for d in s.get("dialogue", [])]
             for d in s.get("dialogue", []):
+                if not (d.get("intention") or "").strip(): errs.append(f"$.shots[{s['id']}]: dialogue has empty intention — DOP must direct the subtext/objective")
                 if not re.search(r"\[[a-z ]+\]|\*[^*]+\*|\.\.\.", d["line"]): errs.append(f"$.shots[{s['id']}]: dialogue has no performance tags — DOP must direct the read")
             if dur_mod:
                 est = dur_mod.estimate(lines, s.get("action", ""), s.get("profile", "dialogue"))
@@ -92,12 +93,13 @@ def check(obj, t):
 
 SKELETONS = {
  "CallSheet": {"schema": "CallSheet/1", "scene": "EP01_SC04", "title": "", "format": "micro-drama", "brief": "", "aspect": "9:16", "target_seconds": 30, "mode": "dailies",
+               "scene_purpose": {"function": "dynamic_shift", "summary": ""}, "turning_point": "",
                "characters": [{"name": "rishi", "look": True, "voice": True, "speaks": True}],
                "dispatch": [{"step": 1, "agent": "script-supervisor", "deliverable": "bible-check", "output": "production/dailies/EP01_SC04/bible_check.json"}],
                "budget": {"max_auto_retakes": 2, "max_rolls": 12}, "decisions": []},
  "ShotList": {"schema": "ShotList/1", "scene": "EP01_SC04", "format": "micro-drama", "aspect": "9:16", "resolution": "720p", "style": "", "audio": "",
-              "shots": [{"id": "4A", "duration_s": 6, "chain_from": None, "camera": "", "direction": "", "action": "", "characters": ["rishi"], "refs": ["production/bible/characters/rishi/front.png"], "profile": "dialogue",
-                         "dialogue": [{"speaker": "caller", "language": "hi", "intention": "", "line": "[slow] ... *word*"}]}]},
+              "shots": [{"id": "4A", "duration_s": 6, "chain_from": None, "is_turning_point": False, "camera": "", "direction": "", "action": "", "characters": ["rishi"], "refs": ["production/bible/characters/rishi/front.png"], "profile": "dialogue",
+                         "dialogue": [{"speaker": "caller", "language": "hi", "intention": "", "objective": "", "subtext": "", "line": "[slow] ... *word*"}]}]},
  "CrewReport": {"schema": "CrewReport/1", "agent": "camera", "scene": "EP01_SC04", "status": "ok", "artifacts": [], "notes": [], "requests": []},
  "Escalation": {"schema": "Escalation/1", "scene": "EP01_SC04", "shot": "4A", "takes_tried": 3, "auto_retakes_used": 2, "reason_code": "speech-clipped-at-end", "reason": "",
                 "evidence": [], "options": [{"key": "A", "label": "Split the line across two shots"}, {"key": "B", "label": "Accept take 2 with a trim"}], "recommended": "A", "question": "", "resolved": None},
@@ -118,13 +120,25 @@ def summarize(obj, t):
         return f"[CallSheet · {obj['scene']}] {obj['target_seconds']}s · {len(obj['dispatch'])} steps · mode {obj['mode']}"
     return json.dumps(obj)[:200]
 
-def compile_manifest(shotlist, bible, out_dir, scene):
-    """ShotList -> camera_roll batch manifest. Quotes look lock + voice fingerprint verbatim; never paraphrases."""
+def compile_manifest(shotlist, bible, out_dir, scene, production_dir=None):
+    """ShotList -> camera_roll batch manifest. Quotes look lock + voice fingerprint verbatim + applies UI Director notes."""
     def read(p):
         return open(p, encoding="utf-8").read().strip() if os.path.exists(p) else ""
+    prod = production_dir or os.path.dirname(os.path.abspath(bible.rstrip("/")))
+    try:
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import provenance  # noqa: E402
+    except Exception:
+        provenance = None
     man = []
     for s in shotlist["shots"]:
         parts = []
+        chars = list(s.get("characters", []))
+        for d in s.get("dialogue", []):
+            sp = d.get("speaker", "")
+            if sp and sp.lower() not in [c.lower() for c in chars]:
+                chars.append(sp.lower())
         for c in s.get("characters", []):
             notes = read(os.path.join(bible, "characters", c, "notes.md"))
             m = re.search(r"## Lock.*?\n(.+?)(\n##|\Z)", notes, re.S)
@@ -134,17 +148,30 @@ def compile_manifest(shotlist, bible, out_dir, scene):
             if fp: parts.append(fp)
         shot_txt = f"Shot {s['id']} ({s['duration_s']}s): {s['camera']}. {s.get('direction','')} {s['action']}".strip()
         if s.get("staging"): shot_txt += f" Staging: {s['staging']}"
+        if s.get("is_turning_point"): shot_txt += " Beat: turning point of the scene — land the power shift and reaction clearly."
+        eb = s.get("emotional_blocking") or {}
+        if eb.get("power_dynamic"): shot_txt += f" Spatial power: {eb['power_dynamic']}."
+        if eb.get("movement_motivation"): shot_txt += f" Motivation: {eb['movement_motivation']}."
+        if eb.get("stillness_accent"): shot_txt += " Stillness: hold dead still to accent the emotional beat; minimal camera motion."
         for d in s.get("dialogue", []):
             seen = "" if d.get("on_screen", True) else " (the speaker is never seen)"
-            shot_txt += f"\nIntention: {d['intention']}\n{d['speaker'].upper()} says{seen}, in {d.get('language','the script language')}: \"{d['line']}\""
+            obj_txt = f"\nObjective: {d['objective']}" if d.get("objective") else ""
+            sub_txt = f"\nSubtext: {d['subtext']}" if d.get("subtext") else ""
+            shot_txt += f"\nIntention: {d['intention']}{obj_txt}{sub_txt}\n{d['speaker'].upper()} says{seen}, in {d.get('language','the script language')}: \"{d['line']}\""
         if s.get("chain_from"):
             shot_txt = "EXACT CONTINUATION of the reference image: same room, same light, same lens, same characters. " + shot_txt
-        prompt = "\n\n".join(parts + [shot_txt, f"Style: {shotlist['style']}", f"Audio: {shotlist['audio']}"])
+        d_notes = provenance.notes_for_shot(prod, scene, s["id"]) if provenance else []
+        prompt_blocks = parts + [shot_txt, f"Style: {shotlist['style']}", f"Audio: {shotlist['audio']}"]
+        if d_notes:
+            prompt_blocks.append("Director notes (apply strictly): " + " | ".join(d_notes))
+        prompt = "\n\n".join(prompt_blocks)
         refs = list(s.get("refs", []))
         if s.get("chain_from"):
             refs.insert(0, os.path.join(out_dir, f"{s['chain_from']}_take1_last.png"))
-        man.append({"id": s["id"], "prompt": prompt, "duration": f"{s['duration_s']}s", "aspect": shotlist["aspect"], "resolution": shotlist.get("resolution", "720p"),
-                    "images": refs, "out": os.path.join(out_dir, f"{s['id']}_take1.mp4"), "profile": s.get("profile", "dialogue"), "chain_from": s.get("chain_from")})
+        man.append({"id": s["id"], "scene": scene, "characters": chars, "director_notes": d_notes, "prompt": prompt,
+                    "duration": f"{s['duration_s']}s", "aspect": shotlist["aspect"], "resolution": shotlist.get("resolution", "720p"),
+                    "images": refs, "out": os.path.join(out_dir, f"{s['id']}_take1.mp4"), "profile": s.get("profile", "dialogue"),
+                    "chain_from": s.get("chain_from"), "stillness_accent": bool(eb.get("stillness_accent"))})
     return man
 
 def compile_cut(shotlist, summary, out_cut_path):
@@ -195,6 +222,12 @@ def main():
     else:
         dd = a.dailies_dir or os.path.join(os.path.dirname(a.bible.rstrip('/')), "dailies", obj["scene"])
         man = compile_manifest(obj, a.bible, dd, obj["scene"]); json.dump(man, open(a.out, "w"), indent=1, ensure_ascii=False)
+        try:
+            sys.path.insert(0, HERE); import studio_board
+            sb_out = os.path.splitext(a.shotlist)[0] + "_storyboard.html"
+            studio_board.build_storyboard_board([a.shotlist], sb_out, dailies_root=dd)
+        except Exception:
+            pass
         print(f"manifest: {a.out} ({len(man)} shots) → dailies {dd}")
 
 if __name__ == "__main__":

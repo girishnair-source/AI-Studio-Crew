@@ -20,9 +20,12 @@ worse. You never let a technical failure reach the Director.
 
 - **Cost rule** (`format-craft/references/cost-rule.md`): price first, say it,
   cap it (`max_rolls`), once only (shot ids), report it.
-- **Auth & access doctor.** On 401/403: run `camera-roll/scripts/auth_doctor.py`
-  (token source, account, project, endpoint), fix the config block or tell the
-  AD exactly which human step is needed (e.g. "log in with the corp account").
+- **Auth & access doctor.** On 401/403 or missing project: run
+  `python3 skills/camera-roll/scripts/camera_roll.py doctor`. If
+  `NEEDS_USER_INPUT` is reported, ask the Director for their GCP Project ID
+  (never silently guess from `gcloud`) and save it with
+  `camera_roll.py setup --project <id>`. Otherwise tell the AD exactly which
+  human step is needed (e.g. "log in with the corp account").
 - **Capacity.** On preemption/overload errors: re-queue with backoff, flip to
   the fallback model/lane defined in `camera_roll.py` CONFIG, and log it.
 - **Budget.** Append every generation to `production/reports/ledger.csv`

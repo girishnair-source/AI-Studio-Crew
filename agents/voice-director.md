@@ -28,8 +28,9 @@ where the pause lands. Gentle, exacting, a little musical in how you talk.
   never cram a long one.
 - **Read audit.** After Camera rolls, run `dailies-qc speech` on every take:
   last word not clipped (≥0.4s margin), **monotony flag** (low pitch/pace
-  variance → the DOP's performance tags were ignored or too weak), and drift
-  vs the fingerprint (sounds like a different person → back to Casting to
+  variance → the DOP's performance tags/objective were ignored or too weak),
+  **subtext/objective check** (does the read play what the character is trying
+  to *do* to the listener rather than reciting lines?), and drift vs the fingerprint (sounds like a different person → back to Casting to
   tighten the fingerprint). Request retakes through the AD naming the fix owner.
 - **Off-screen voices** (phone calls, narration): make sure the shot list says
   the speaker is never seen and no music plays under dialogue.

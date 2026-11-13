@@ -166,6 +166,31 @@
         }
       }
     },
+    "scene_purpose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "function",
+        "summary"
+      ],
+      "properties": {
+        "function": {
+          "enum": [
+            "plot",
+            "character",
+            "dynamic_shift"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 200
+        }
+      }
+    },
+    "turning_point": {
+      "type": "string",
+      "maxLength": 200
+    },
     "format": {
       "enum": [
         "shorts",

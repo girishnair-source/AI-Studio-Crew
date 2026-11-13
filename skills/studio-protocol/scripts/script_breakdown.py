@@ -46,6 +46,13 @@ Format: {aspect} · est. {est}s (~{clips} clips) · mode: {mode}
 ## Script
 {body}
 
+## Scene Purpose (plot / character / dynamic shift)
+- Function:
+- Summary:
+
+## Turning Point (exact beat where power shifts or objective changes)
+- Beat:
+
 ## Needs
 - Characters: {chars}
 - Departments: (1st AD fills in)
@@ -72,7 +79,16 @@ def main():
             if not os.path.exists(p):
                 open(p, "w", encoding="utf-8").write(TEMPLATE.format(ep=a.episode, sc=sc, heading=s["heading"], aspect=show.get("aspect", "9:16"), est=info["estimated_seconds"], clips=info["estimated_clips"], mode=show.get("control_mode", "dailies"), body=info["body"], chars=chars))
     if not a.dry_run:
-        json.dump({"episode": a.episode, "scenes": out, "total_estimated_seconds": sum(x["estimated_seconds"] for x in out)}, open(os.path.join(a.dir, "callsheets", f"{a.episode}_breakdown.json"), "w"), indent=2, ensure_ascii=False)
+        bd_path = os.path.join(a.dir, "callsheets", f"{a.episode}_breakdown.json")
+        json.dump({"episode": a.episode, "scenes": out, "total_estimated_seconds": sum(x["estimated_seconds"] for x in out)}, open(bd_path, "w"), indent=2, ensure_ascii=False)
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import studio_board
+            studio_board.build_script_board(bd_path, out_html=os.path.join(a.dir, "callsheets", f"{a.episode}_script_board.html"))
+            studio_board.build_screenplay_board(a.script, out_html=os.path.join(a.dir, "callsheets", f"{a.episode}_screenplay.html"))
+        except Exception:
+            pass
     for x in out: print(f"{x['scene']}  {x['heading'][:48]:48s} ~{x['estimated_seconds']:3d}s  clips={x['estimated_clips']}  cast={list(x['characters'])}")
     print(f"total ~{sum(x['estimated_seconds'] for x in out)}s across {len(out)} scenes")
 

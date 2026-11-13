@@ -16,7 +16,7 @@ Reason codes → auto-fix (applied to the prompt/params, logged):
   capacity/timeout        → not a retake (already retried inside camera_roll); escalate if still failing
 Anything else            → escalate after the cap.
 """
-import argparse, json, os, re, sys, time, concurrent.futures as cf
+import argparse, json, os, re, sys, threading, time, concurrent.futures as cf
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "camera-roll", "scripts")); sys.path.insert(0, os.path.join(HERE, "..", "..", "dailies-qc", "scripts")); sys.path.insert(0, HERE)
 from camera_roll import roll, RollError, last_frame, CONFIG as CR_CONFIG  # noqa: E402
@@ -77,6 +77,17 @@ def escalate(scene_dir, scene, shot, takes, reason, evidence, parent):
     telemetry._write({"event": "escalation", "trace_id": parent["trace_id"], "span_id": parent["span_id"], "name": "escalate", "ts_ns": time.time_ns(), "attributes": {"scene": scene, "shot": shot, "reason": reason}})
     return p, esc
 
+def try_acquire_roll(budget):
+    """Thread-safe roll budget + scene wall-clock deadline check. Returns None if allowed, else reason_code."""
+    with budget["lock"]:
+        if budget.get("deadline") and time.time() > budget["deadline"]:
+            return "scene-timeout"
+        if budget["rolls"] >= budget["max_rolls"]:
+            return "roll-budget-exhausted"
+        budget["rolls"] += 1
+        return None
+
+
 def run_shot(s, scene, scene_dir, max_auto, budget, parent, no_llm_qc=False):
     shot = s["id"]; dur = int(round(float(str(s["duration"]).rstrip("s")))); profile = s.get("profile", "dialogue")
     prompt = s["prompt"]; images = list(s.get("images", [])); evidence = []; takes = 0; best = None
@@ -85,26 +96,31 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent, no_llm_qc=False):
         exp_dlg = " ".join(x.get("line", "") for x in exp_dlg)
     action = s.get("action", "")
     with telemetry.span("shot", parent, agent="camera", scene=scene, shot=shot) as sp:
-        while True:
-            if budget["rolls"] >= budget["max_rolls"]:
-                p, esc = escalate(scene_dir, scene, shot, takes, "roll-budget-exhausted", evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best}
-            takes += 1; budget["rolls"] += 1
+        for _ in range(max_auto + 1):
+            stop_reason = try_acquire_roll(budget)
+            if stop_reason:
+                p, esc = escalate(scene_dir, scene, shot, takes, stop_reason, evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best}
+            takes += 1
             out = os.path.join(scene_dir, f"{shot}_take{takes}.mp4")
             try:
                 with telemetry.span("camera.roll", sp, agent="camera", scene=scene, shot=shot, take=takes) as rs:
-                    res = roll(prompt, out, task=s.get("task", "text_to_video"), duration=f"{dur}s", aspect=s.get("aspect", "9:16"), resolution=s.get("resolution", "720p"), images=images, shot_id=f"{scene}/{shot}/t{takes}")
+                    res = roll(prompt, out, task=s.get("task", "text_to_video"), duration=f"{dur}s", aspect=s.get("aspect", "9:16"), resolution=s.get("resolution", "720p"), images=images, shot_id=f"{scene}/{shot}/t{takes}", characters=s.get("characters", ()), scene=scene, director_notes=s.get("director_notes", ()))
                     telemetry.record_tokens(rs, gen_tokens=res.get("gen_tokens", 0), llm_in=res.get("llm_in", 0), llm_out=res.get("llm_out", 0))
             except RollError as e:
                 evidence.append(f"take{takes}: {e.kind}: {str(e)[:120]}")
                 reason = "safety" if e.kind == "safety" else ("capacity" if e.kind in ("capacity", "timeout") else e.kind)
-                if reason in ("safety", "capacity", "auth", "access", "request") or takes - 1 >= max_auto:
+                if reason in ("safety", "capacity", "auth", "access", "request", "failed") or takes - 1 >= max_auto:
                     p, esc = escalate(scene_dir, scene, shot, takes, reason, evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best}
                 continue
             with telemetry.span("qc", sp, agent="dailies-qc", scene=scene, shot=shot, take=takes):
                 q = qc_take(out, profile, expected_text=exp_dlg, refs=images, action=action, no_llm=no_llm_qc)
             try: last_frame(out, out.replace(".mp4", "_last.png"))
             except Exception: pass
-            flags = [f for f in q.get("flags", []) if f != "no-speech" or s.get("dialogue")]
+            flags = [
+                f for f in q.get("flags", [])
+                if (f != "no-speech" or s.get("dialogue"))
+                and not (f == "frozen-video" and s.get("stillness_accent"))
+            ]
             evidence.append(f"take{takes}: flags={flags} margin={q.get('margin')} f0={q.get('f0_std_semitones')}")
             cand = {"take": out, "qc": q, "n": takes}
             if best is None or len(flags) < len(best["qc"].get("flags", [])): best = cand
@@ -116,26 +132,61 @@ def run_shot(s, scene, scene_dir, max_auto, budget, parent, no_llm_qc=False):
             if not new_prompt:
                 p, esc = escalate(scene_dir, scene, shot, takes, flags[0], evidence, sp); return {"shot": shot, "status": "escalate", "escalation": p, "best": best, "takes": takes}
             prompt, dur = new_prompt, new_dur; evidence.append(f"auto-fix {takes}: {fix}")
+        p, esc = escalate(scene_dir, scene, shot, takes, "max-retakes-reached", evidence, sp)
+        return {"shot": shot, "status": "escalate", "escalation": p, "best": best, "takes": takes}
+
+
+def execute_scene(shots, scene, scene_dir, max_auto=POLICY_MAX_AUTO_RETAKES, max_rolls=12, max_scene_seconds=600, parallel=6, no_llm_qc=False, parent=None):
+    """Run independent shots in parallel and chained shots only after their parent locks ('ok')."""
+    budget = {"rolls": 0, "max_rolls": max_rolls, "deadline": time.time() + max_scene_seconds, "lock": threading.Lock()}
+    parent = parent or telemetry.start("scene", telemetry.parent_from_env(), agent="first-ad", scene=scene)
+    done, results, pending = {}, [], [dict(s) for s in shots]
+    max_waves = len(pending) + 2
+    for _ in range(max_waves):
+        if not pending:
+            break
+        # Block any child whose parent already finished with non-ok status
+        progressed_block = True
+        while progressed_block:
+            progressed_block = False
+            for s in list(pending):
+                par = s.get("chain_from")
+                if par and par in done and done[par].get("status") != "ok":
+                    blk = {"shot": s["id"], "status": "blocked", "reason": f"chain parent {par} not locked ({done[par].get('status')})"}
+                    done[s["id"]] = blk
+                    results.append(blk)
+                    pending.remove(s)
+                    progressed_block = True
+        ready = [s for s in pending if not s.get("chain_from") or done.get(s["chain_from"], {}).get("status") == "ok"]
+        if not ready:
+            break
+        # Bind winning parent take's last frame dynamically
+        for s in ready:
+            par = s.get("chain_from")
+            if par and done.get(par, {}).get("take"):
+                win_last = done[par]["take"].replace(".mp4", "_last.png")
+                imgs = list(s.get("images", []))
+                stale_prefix = os.path.join(scene_dir, f"{par}_take")
+                imgs = [win_last if str(p).startswith(stale_prefix) or str(p).endswith(f"{par}_take1_last.png") else p for p in imgs]
+                if win_last not in imgs:
+                    imgs.insert(0, win_last)
+                s["images"] = imgs
+        with cf.ThreadPoolExecutor(max_workers=parallel) as ex:
+            for s, res in zip(ready, ex.map(lambda s: run_shot(s, scene, scene_dir, max_auto, budget, parent, no_llm_qc=no_llm_qc), ready)):
+                done[s["id"]] = res; results.append(res); pending.remove(s)
+    for s in pending:
+        results.append({"shot": s["id"], "status": "blocked", "reason": f"chain parent {s.get('chain_from')} unresolved or cyclic"})
+    return results, budget, parent
+
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run"); r.add_argument("--manifest", required=True); r.add_argument("--scene", required=True); r.add_argument("--max-auto-retakes", type=int, default=POLICY_MAX_AUTO_RETAKES)
-    r.add_argument("--max-rolls", type=int, default=12); r.add_argument("--parallel", type=int, default=6); r.add_argument("--production", default=os.environ.get("AGY_PRODUCTION_DIR", "production")); r.add_argument("--no-llm-qc", action="store_true")
+    r.add_argument("--max-rolls", type=int, default=12); r.add_argument("--max-scene-seconds", type=int, default=600); r.add_argument("--parallel", type=int, default=6); r.add_argument("--production", default=os.environ.get("AGY_PRODUCTION_DIR", "production")); r.add_argument("--no-llm-qc", action="store_true")
     a = ap.parse_args()
     max_auto = min(a.max_auto_retakes, POLICY_MAX_AUTO_RETAKES)
     shots = json.load(open(a.manifest)); scene_dir = os.path.join(a.production, "dailies", a.scene); os.makedirs(scene_dir, exist_ok=True)
-    budget = {"rolls": 0, "max_rolls": a.max_rolls}
-    parent = telemetry.start("scene", telemetry.parent_from_env(), agent="first-ad", scene=a.scene)
-    # chained shots run after their parent; independents in parallel
-    done, results, pending = {}, [], list(shots)
-    while pending:
-        ready = [s for s in pending if not s.get("chain_from") or s["chain_from"] in done]
-        if not ready: break
-        with cf.ThreadPoolExecutor(max_workers=a.parallel) as ex:
-            for s, res in zip(ready, ex.map(lambda s: run_shot(s, a.scene, scene_dir, max_auto, budget, parent, no_llm_qc=a.no_llm_qc), ready)):
-                done[s["id"]] = res; results.append(res); pending.remove(s)
-    for s in pending:  # parents escalated → children blocked
-        results.append({"shot": s["id"], "status": "blocked", "reason": f"chain parent {s['chain_from']} not locked"})
+    results, budget, parent = execute_scene(shots, a.scene, scene_dir, max_auto=max_auto, max_rolls=a.max_rolls, max_scene_seconds=a.max_scene_seconds, parallel=a.parallel, no_llm_qc=a.no_llm_qc)
     locked = [{"shot": r["shot"], "take": r["take"], "trim_to": r["qc"].get("trim_to")} for r in results if r["status"] == "ok"]
     retakes = sum(max(0, r.get("takes", 1) - 1) for r in results)
     causes = {}

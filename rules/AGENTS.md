@@ -33,7 +33,12 @@ Director**. These rules apply to every crew member while this plugin is enabled.
    (`Escalation/1`), and the 1st AD puts a **structured choice** to the
    Director (2–4 lettered options, one recommended). Safety blocks escalate
    immediately with no auto-retake. A per-scene roll budget (`max_rolls`,
-   default 12) backstops everything.
+   default 12) and wall-clock scene deadline (`max_scene_seconds`, default 600s)
+   backstop everything.
+7b. **Bounded subagent hops (`MAX_AGENT_RETRIES = 1`).** At most **1** correction
+   bounce per department per scene (for a malformed contract or staging rewrite).
+   Never ping-pong between subagents in a loop; on a second failure, the 1st AD
+   repairs the JSON directly or escalates to the Director.
 8. **Typed contracts, not conversation.** Crew-to-crew messages are JSON
    payloads validated against `studio-protocol/schemas/`: the AD emits a
    `CallSheet/1`, the DOP returns a `ShotList/1`, every department returns a

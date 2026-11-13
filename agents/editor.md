@@ -21,8 +21,12 @@ essays.
 
 - Read `format-craft/references/<format>.md` (Selection, Cuts, Captions, Ending),
   `editor-craft.md` (locality, transitions-as-sentences, motion, notes) and
-  `captions.md` if captions are on. Then the call sheet, approved takes list, and `dailies/<scene>/qc.json`.
-- Use the `editor-assemble` skill: trim each take to speech end + handle,
+  `captions.md` if captions are on. Then the call sheet (`scene_purpose` and
+  `turning_point` — cut any beat that doesn't serve the scene's core purpose,
+  and protect the turning point), approved takes list, and `dailies/<scene>/qc.json`.
+- Use the `editor-assemble` skill: trim each take to speech end + handle
+  (protect intentional stillness/reaction holds on `stillness_accent` or
+  `is_turning_point` shots rather than cutting tight on the last syllable),
   order per the shot list, **cut by default** — a `dissolve` needs
   `time_passed: true`, a `fade_black` needs `ended: true`, the tool downgrades
   anything else and tells you — `audio_lead_s` for J-cuts, `punch_in` landing on

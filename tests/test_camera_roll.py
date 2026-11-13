@@ -90,6 +90,20 @@ class TestCameraRoll(unittest.TestCase):
             self.assertEqual(m_roll.call_args.kwargs["task"], "reference_to_video")
             self.assertEqual(m_roll.call_args.kwargs["resolution"], "4k")
 
+    def test_local_setup_config_persists_outside_repo(self):
+        with tempfile.TemporaryDirectory() as td:
+            cfg_path = os.path.join(td, "config.json")
+            orig_path = camera_roll.LOCAL_CONFIG_PATH
+            try:
+                camera_roll.LOCAL_CONFIG_PATH = cfg_path
+                camera_roll.setup_config(project="my-gcp-proj", lane="veo-3.1-fast")
+                loaded = camera_roll.load_local_config()
+                self.assertEqual(loaded["project"], "my-gcp-proj")
+                self.assertEqual(loaded["default_lane"], "veo-3.1-fast")
+                self.assertEqual(camera_roll.CONFIG["lanes"]["omni-1.2"]["project"], "my-gcp-proj")
+            finally:
+                camera_roll.LOCAL_CONFIG_PATH = orig_path
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -139,6 +139,16 @@
                   "type": "string",
                   "maxLength": 200
                 },
+                "objective": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "active verb: what the character is trying to DO to the listener"
+                },
+                "subtext": {
+                  "type": "string",
+                  "maxLength": 200,
+                  "description": "what the character is hiding or feeling underneath the words"
+                },
                 "line": {
                   "type": "string",
                   "maxLength": 700
@@ -175,6 +185,30 @@
                   "type": "string",
                   "maxLength": 24
                 }
+              }
+            }
+          },
+          "is_turning_point": {
+            "type": "boolean",
+            "description": "true on the shot where power shifts or objective changes"
+          },
+          "emotional_blocking": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "power_dynamic": {
+                "type": "string",
+                "maxLength": 240,
+                "description": "how space/height/proximity/framing expresses who holds control vs who is vulnerable"
+              },
+              "movement_motivation": {
+                "type": "string",
+                "maxLength": 240,
+                "description": "the internal emotional push behind any physical movement or stillness"
+              },
+              "stillness_accent": {
+                "type": "boolean",
+                "description": "true when intentional dead stillness/freeze is used to accent peak tension"
               }
             }
           }

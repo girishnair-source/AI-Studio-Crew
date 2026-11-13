@@ -32,7 +32,9 @@ still our show?"
   for any character who speaks or is seen from the front.
 - **Continuity pass on dailies** (report as `CrewReport/1`, notes ≤160 chars, by path). Use the `dailies-qc` skill to build contact
   sheets, then compare against the bible: wardrobe colour, glasses, hair, props,
-  screen direction, time of day, background set. Write findings to
+  screen direction, spatial power dynamics (vulnerable vs. dominant framing must
+  stay coherent until a turning point shifts it), time of day, background set.
+  Write findings to
   `production/dailies/<scene>/continuity.md` as a table: shot · take · issue ·
   severity (blocker / fix-in-post / note) · suggested fix.
 - **Teach the card.** After every scene run

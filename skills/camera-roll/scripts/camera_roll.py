@@ -21,27 +21,58 @@ Other:
 import argparse, base64, concurrent.futures as cf, csv, getpass, json, mimetypes, os, shutil, subprocess, sys, time, urllib.error, urllib.request
 
 # ───────────────────────────── CONFIG (the only place model/host names live) ─────────────────────────────
+LOCAL_CONFIG_PATH = os.environ.get("AGY_CONFIG_FILE", os.path.expanduser("~/.config/ai-studio-crew/config.json"))
+
+
+def load_local_config():
+    try:
+        if os.path.exists(LOCAL_CONFIG_PATH):
+            with open(LOCAL_CONFIG_PATH, encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def save_local_config(data):
+    os.makedirs(os.path.dirname(os.path.abspath(LOCAL_CONFIG_PATH)), exist_ok=True)
+    cur = load_local_config()
+    cur.update({k: v for k, v in data.items() if v is not None})
+    with open(LOCAL_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cur, f, indent=2)
+    try:
+        os.chmod(LOCAL_CONFIG_PATH, 0o600)
+    except Exception:
+        pass
+    return LOCAL_CONFIG_PATH
+
+
+_LOCAL_CFG = load_local_config()
+_DEFAULT_PROJECT = os.environ.get("AGY_PROJECT") or _LOCAL_CFG.get("project", "")
+
 CONFIG = {
     "lanes": {
         # name: {api, model, host, project, ...}. Lane names are stable; model ids change here only.
-        "omni-1.2": {"api": "interactions", "model": "gemini-omni-1.2-flash", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", ""), "min_s": 3, "max_s": 15},
-        "omni-1.1": {"api": "interactions", "model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": os.environ.get("AGY_PROJECT", ""), "min_s": 3, "max_s": 15},
-        "veo-3.1": {"api": "veo", "model": "veo-3.1-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": os.environ.get("AGY_PROJECT", ""), "min_s": 4, "max_s": 8},
-        "veo-3.1-fast": {"api": "veo", "model": "veo-3.1-fast-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": os.environ.get("AGY_PROJECT", ""), "min_s": 4, "max_s": 8},
-        "veo-3.1-lite": {"api": "veo", "model": "veo-3.1-lite-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": os.environ.get("AGY_PROJECT", ""), "min_s": 4, "max_s": 8},
+        "omni-1.2": {"api": "interactions", "model": "gemini-omni-1.2-flash", "host": "aiplatform.googleapis.com", "project": _DEFAULT_PROJECT, "min_s": 3, "max_s": 15},
+        "omni-1.1": {"api": "interactions", "model": "gemini-omni-1.1-flash-preview", "host": "aiplatform.googleapis.com", "project": _DEFAULT_PROJECT, "min_s": 3, "max_s": 15},
+        "veo-3.1": {"api": "veo", "model": "veo-3.1-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": _DEFAULT_PROJECT, "min_s": 4, "max_s": 8},
+        "veo-3.1-fast": {"api": "veo", "model": "veo-3.1-fast-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": _DEFAULT_PROJECT, "min_s": 4, "max_s": 8},
+        "veo-3.1-lite": {"api": "veo", "model": "veo-3.1-lite-generate-001", "host": "us-central1-aiplatform.googleapis.com", "location": "us-central1", "project": _DEFAULT_PROJECT, "min_s": 4, "max_s": 8},
     },
-    "default_lane": os.environ.get("AGY_LANE", "omni-1.2"),
-    "fallback_lane": os.environ.get("AGY_FALLBACK_LANE", "omni-1.1"),
+    "default_lane": os.environ.get("AGY_LANE") or _LOCAL_CFG.get("default_lane", "omni-1.2"),
+    "fallback_lane": os.environ.get("AGY_FALLBACK_LANE") or _LOCAL_CFG.get("fallback_lane", "omni-1.1"),
     "draft_resolution": os.environ.get("AGY_DRAFT_RES", "360p"),
     # Durations are DECIDED PER SHOT from the script (studio-protocol/scripts/duration.py); these are only the model's bounds.
     "min_clip_seconds": 3,
     "max_clip_seconds": 15,
     "resolutions": ["360p", "720p", "1080p", "4k"],
     "max_reference_images": 6,
-    "retries": 3,
-    "backoff_s": [8, 20, 45],
+    "retries": 2,
+    "max_failed_retries": 1,
+    "backoff_s": [8, 20],
     "poll_s": 5,
-    "timeout_s": 420,
+    "timeout_s": 240,
+    "max_roll_wall_s": 300,
     "ledger": os.path.join(os.environ.get("AGY_PRODUCTION_DIR", "production"), "reports", "ledger.csv"),
 }
 # Optional pre-release lane for internal testers: set AGY_PREVIEW_MODEL / AGY_PREVIEW_HOST / AGY_PREVIEW_PROJECT in the environment.
@@ -305,10 +336,31 @@ def _roll_dry_run(prompt, out, duration, aspect, resolution, shot_id):
     return {"out": out, "lane": "dry-run", "model": "synthetic-ffmpeg", "interaction_id": "dry-run", "seconds": 0.1, "gen_tokens": 0, "llm_in": 0, "llm_out": 0}
 
 
-def roll_once(lane_name, prompt, out, task="text_to_video", duration="8s", aspect="9:16", resolution="720p", images=(), audio=None, video=None, shot_id="", dry_run=False):
+def _record_provenance(res, prompt, task, duration, aspect, resolution, images, audio, video, shot_id, characters, scene, director_notes):
+    try:
+        proto_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "studio-protocol", "scripts"))
+        if proto_dir not in sys.path:
+            sys.path.insert(0, proto_dir)
+        import provenance  # noqa: E402
+        refs = list(images or ()) + ([video] if video else []) + ([audio] if audio else [])
+        sc = scene or (shot_id.split("/")[0] if "/" in str(shot_id) else "")
+        sid = shot_id.split("/")[1] if "/" in str(shot_id) else str(shot_id)
+        provenance.record(
+            res["out"], kind="video", prompt=prompt, model=res.get("model", ""), lane=res.get("lane", ""),
+            task=task, params={"duration": duration, "aspect": aspect, "resolution": resolution},
+            refs=refs, characters=characters or (), scene=sc, shot_id=sid,
+            interaction_id=res.get("interaction_id", ""), director_notes=director_notes or (),
+        )
+    except Exception:
+        pass
+
+
+def roll_once(lane_name, prompt, out, task="text_to_video", duration="8s", aspect="9:16", resolution="720p", images=(), audio=None, video=None, shot_id="", dry_run=False, characters=(), scene="", director_notes=()):
     if dry_run or os.environ.get("AGY_DRY_RUN") == "1":
         duration = normalize_duration(duration)
-        return _roll_dry_run(prompt, out, duration, aspect, resolution, shot_id)
+        res = _roll_dry_run(prompt, out, duration, aspect, resolution, shot_id)
+        _record_provenance(res, prompt, "dry_run", duration, aspect, resolution, images, audio, video, shot_id, characters, scene, director_notes)
+        return res
     if lane_name not in CONFIG["lanes"]:
         raise RollError("request", f"unknown lane {lane_name!r}; available: {list(CONFIG['lanes'])}")
     lane = CONFIG["lanes"][lane_name]
@@ -319,30 +371,45 @@ def roll_once(lane_name, prompt, out, task="text_to_video", duration="8s", aspec
         raise RollError("request", f"{len(images)} reference images > {CONFIG['max_reference_images']}")
     api = lane.get("api", "interactions")
     if api == "veo":
-        return _roll_veo(lane_name, lane, prompt, out, task, duration, aspect, resolution, images, shot_id)
-    return _roll_interactions(lane_name, lane, prompt, out, task, duration, aspect, resolution, images, audio, video, shot_id)
+        res = _roll_veo(lane_name, lane, prompt, out, task, duration, aspect, resolution, images, shot_id)
+    else:
+        res = _roll_interactions(lane_name, lane, prompt, out, task, duration, aspect, resolution, images, audio, video, shot_id)
+    _record_provenance(res, prompt, task, duration, aspect, resolution, images, audio, video, shot_id, characters, scene, director_notes)
+    return res
 
 
 def roll(prompt, out, lane=None, **kw):
-    """Roll with retries; capacity -> backoff then fallback lane; auth -> refresh once; safety -> raise immediately."""
+    """Roll with bounded retries, wall-clock deadline, and 1-retry cap on soft refusals ('failed')."""
     lane = lane or CONFIG["default_lane"]
     lanes = [lane]
     if CONFIG["fallback_lane"] and CONFIG["fallback_lane"] != lane:
         lanes.append(CONFIG["fallback_lane"])
+    t_wall = time.time()
+    wall_cap = CONFIG.get("max_roll_wall_s", 300)
+    failed_count = 0
     last = None
     for ln in lanes:
         for i in range(CONFIG["retries"]):
+            if last is not None and time.time() - t_wall > wall_cap:
+                raise RollError("timeout", f"exceeded max_roll_wall_s ({wall_cap}s)", str(last))
             try:
                 return roll_once(ln, prompt, out, **kw)
             except RollError as e:
                 last = e
                 if e.kind in ("safety", "request"):
                     raise
+                if e.kind == "failed":
+                    failed_count += 1
+                    if failed_count > CONFIG.get("max_failed_retries", 1):
+                        raise
                 if e.kind == "auth" and i == 0:
                     get_token(force=True)
                     continue
                 if e.kind in ("capacity", "timeout", "failed"):
-                    time.sleep(CONFIG["backoff_s"][min(i, len(CONFIG["backoff_s"]) - 1)])
+                    wait_s = CONFIG["backoff_s"][min(i, len(CONFIG["backoff_s"]) - 1)]
+                    if time.time() - t_wall + wait_s > wall_cap:
+                        raise RollError("timeout", f"exceeded max_roll_wall_s ({wall_cap}s)", str(e))
+                    time.sleep(wait_s)
                     continue
                 if e.kind == "access":
                     break  # try next lane / project
@@ -358,8 +425,25 @@ def promote_clip(draft_video, out, resolution="1080p", method="upscale", prompt=
 
 # ── utilities ────────────────────────────────────────────────────────────────────────────────────────────
 def last_frame(video, out):
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-sseof", "-0.08", "-i", video, "-frames:v", "1", "-update", "1", out], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-sseof", "-0.08", "-i", video, "-frames:v", "1", "-update", "1", out], check=True, timeout=60)
     return out
+
+
+def setup_config(project=None, lane=None, fallback_lane=None):
+    """Persist user's local GCP project & lane defaults outside the git repo."""
+    if not project and sys.stdin.isatty():
+        project = input("Enter your Google Cloud Project ID (with Vertex AI enabled): ").strip()
+    if not project:
+        raise SystemExit("NEEDS_USER_INPUT: Pass --project <gcp-project-id> (never guess from gcloud).")
+    path = save_local_config({"project": project, "default_lane": lane, "fallback_lane": fallback_lane})
+    for cfg in CONFIG["lanes"].values():
+        cfg["project"] = project
+    if lane:
+        CONFIG["default_lane"] = lane
+    if fallback_lane:
+        CONFIG["fallback_lane"] = fallback_lane
+    print(f"Saved local config to {path} (outside repo, chmod 600).")
+    return path
 
 
 def doctor():
@@ -367,8 +451,13 @@ def doctor():
     for name, fn in (("AGY_ACCESS_TOKEN", _token_env), ("stubby", _token_stubby), ("gcloud", _token_gcloud)):
         t = fn()
         print(f"  {name:16s} {'ok' if t else '—'}")
-    if not os.environ.get("AGY_PROJECT"):
-        print("  AGY_PROJECT         — not set (export AGY_PROJECT=<your-gcp-project>)")
+    proj = os.environ.get("AGY_PROJECT") or load_local_config().get("project", "")
+    if not proj:
+        print("  AGY_PROJECT         — not set")
+        print("  NEEDS_USER_INPUT: Ask the user for their GCP Project ID, then run: camera_roll.py setup --project <id>")
+    else:
+        src = "env AGY_PROJECT" if os.environ.get("AGY_PROJECT") else f"local config ({LOCAL_CONFIG_PATH})"
+        print(f"  project             {proj} (from {src})")
     for ln, cfg in CONFIG["lanes"].items():
         api = cfg.get("api", "interactions")
         if not cfg.get("project"):
@@ -427,9 +516,16 @@ def main():
     lf = sub.add_parser("last-frame")
     lf.add_argument("--video", required=True)
     lf.add_argument("--out", required=True)
+    su = sub.add_parser("setup")
+    su.add_argument("--project", help="Google Cloud Project ID with Vertex AI enabled")
+    su.add_argument("--lane", choices=list(CONFIG["lanes"]), help="default generation lane")
+    su.add_argument("--fallback-lane", choices=list(CONFIG["lanes"]), help="fallback generation lane")
     sub.add_parser("doctor")
 
     a = ap.parse_args()
+    if a.cmd == "setup":
+        setup_config(project=a.project, lane=a.lane, fallback_lane=a.fallback_lane)
+        return doctor()
     if a.cmd == "doctor":
         return doctor()
     if a.cmd == "last-frame":
@@ -473,6 +569,7 @@ def main():
                     s["prompt"], s["out"], lane=a.lane or s.get("lane"), task=s.get("task", "text_to_video"),
                     duration=s["duration"], aspect=s.get("aspect", "9:16"), resolution=res_target,
                     images=s.get("images", []), audio=s.get("audio"), video=s.get("video"), shot_id=s.get("id", ""), dry_run=a.dry_run,
+                    characters=s.get("characters", ()), scene=s.get("scene", ""), director_notes=s.get("director_notes", ()),
                 )
                 return {"id": s.get("id"), "status": "ok", **res}
             except RollError as e:

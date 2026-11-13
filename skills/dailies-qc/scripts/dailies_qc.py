@@ -22,7 +22,7 @@ PROSODY_PROFILES = {"presenter": (4.5, 3.0), "dialogue": (3.0, 1.8), "narration"
 
 
 def dur(path):
-    return float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path]).decode())
+    return float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path], timeout=30).decode())
 
 
 def probe_streams(path):
@@ -30,6 +30,7 @@ def probe_streams(path):
     out = subprocess.check_output(
         ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,width,height,r_frame_rate", "-of", "json", path],
         text=True,
+        timeout=30,
     )
     streams = json.loads(out).get("streams", [])
     v = next((s for s in streams if s.get("codec_type") == "video"), None)
@@ -51,13 +52,14 @@ def contact(video, frames=5, out=None):
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", video, "-vf", f"select='{sel}',scale=216:-1,tile={frames}x1", "-frames:v", "1", out],
         check=True,
+        timeout=60,
     )
     return out
 
 
 def last(video, out=None):
     out = out or os.path.splitext(video)[0] + "_last.png"
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-sseof", "-0.08", "-i", video, "-frames:v", "1", "-update", "1", out], check=True)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-sseof", "-0.08", "-i", video, "-frames:v", "1", "-update", "1", out], check=True, timeout=60)
     return out
 
 
@@ -484,21 +486,34 @@ def build_board(scene_dir, out=None, embed=False):
                 meta += f" · WER={wer}"
             if vis.get("face_consistency") is not None:
                 meta += f" · face={vis['face_consistency']}/5"
+            prov_html = ""
+            sidecar = os.path.join(scene_dir, name + ".meta.json")
+            if os.path.exists(sidecar):
+                with open(sidecar, encoding="utf-8") as pf:
+                    pm = json.load(pf)
+                refs_txt = ", ".join(os.path.basename(r.get("path", "")) + (f" #{r['sha256_16'][:8]}" if r.get("sha256_16") else "") for r in pm.get("refs", [])) or "none"
+                prov_html = (
+                    f"<details class='prov'><summary>🔍 Exact Prompt & Resources ({_html.escape(pm.get('model',''))})</summary>"
+                    f"<div class='meta'>Refs: {_html.escape(refs_txt)} · Chars: {_html.escape(', '.join(pm.get('characters',[])) or '—')}</div>"
+                    f"<pre>{_html.escape(pm.get('prompt',''))}</pre></details>"
+                )
             take_html.append(
                 f"<div class='take' data-shot='{_html.escape(sid)}' data-take='{_html.escape(name)}'>"
                 f"<div class='th'><strong>{_html.escape(name)}</strong> {badges}</div>"
                 + (f"<img src='{img_src}' alt='{_html.escape(name)}'/>" if img_src else "")
                 + f"<div class='meta'>{_html.escape(meta)}</div>"
                 + (f"<div class='tr'>\"{_html.escape(tr)}\"</div>" if tr else "")
+                + prov_html
+                + f"<input class='note' placeholder='💬 Director note for {_html.escape(sid)}...' oninput=\"note('{_html.escape(sid)}',this.value)\"/>"
                 + f"<button onclick=\"pick('{_html.escape(sid)}','{_html.escape(name)}',this)\">Select Take</button></div>"
             )
         cards.append(f"<section class='shot'><h2>Shot {_html.escape(sid)}</h2><div class='grid'>{''.join(take_html)}</div></section>")
 
     page = f"""<!doctype html><html><head><meta charset="utf-8"><title>Dailies Board — {_html.escape(os.path.basename(os.path.abspath(scene_dir)))}</title>
-<style>body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:24px}}h1,h2{{margin:0 0 12px}}.bar{{position:sticky;top:0;background:#1b1b1b;padding:12px 16px;border:1px solid #333;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}}.shot{{margin-bottom:28px}}.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}}.take{{background:#1a1a1a;border:2px solid #2b2b2b;border-radius:8px;padding:12px}}.take.picked{{border-color:#22c55e}}.take img{{width:100%;border-radius:4px;margin:8px 0}}.th{{display:flex;justify-content:space-between;align-items:center}}.ok{{background:#14532d;color:#86efac;padding:2px 8px;border-radius:99px;font-size:12px}}.flag{{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:99px;font-size:12px;margin-left:4px}}.meta,.tr{{font-size:12px;color:#aaa;margin:4px 0}}button{{margin-top:8px;background:#2563eb;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer}}</style></head>
+<style>body{{font-family:system-ui,sans-serif;background:#111;color:#eee;margin:24px}}h1,h2{{margin:0 0 12px}}.bar{{position:sticky;top:0;background:#1b1b1b;padding:12px 16px;border:1px solid #333;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}}.shot{{margin-bottom:28px}}.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px}}.take{{background:#1a1a1a;border:2px solid #2b2b2b;border-radius:8px;padding:12px}}.take.picked{{border-color:#22c55e}}.take img{{width:100%;border-radius:4px;margin:8px 0}}.th{{display:flex;justify-content:space-between;align-items:center}}.ok{{background:#14532d;color:#86efac;padding:2px 8px;border-radius:99px;font-size:12px}}.flag{{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:99px;font-size:12px;margin-left:4px}}.meta,.tr{{font-size:12px;color:#aaa;margin:4px 0}}details.prov{{background:#12151c;border:1px solid #2b3445;border-radius:6px;padding:6px 8px;margin:6px 0;font-size:11px}}details.prov summary{{cursor:pointer;color:#93c5fd;font-weight:600}}details.prov pre{{white-space:pre-wrap;color:#cbd5e1;max-height:140px;overflow:auto;margin:6px 0 0}}.note{{width:100%;background:#0e1015;border:1px solid #333;color:#eee;padding:6px 8px;border-radius:5px;font-size:12px;margin-top:6px;box-sizing:border-box}}button{{margin-top:8px;background:#2563eb;color:#fff;border:0;padding:6px 12px;border-radius:6px;cursor:pointer}}</style></head>
 <body><div class="bar"><div><strong>Dailies Board</strong> · {_html.escape(scene_dir)}</div><code id="sel">No takes selected</code></div>
 {''.join(cards)}
-<script>const picks={{}};function pick(s,t,btn){{picks[s]=t;document.querySelectorAll(`.take[data-shot="${{s}}"]`).forEach(e=>e.classList.remove('picked'));btn.closest('.take').classList.add('picked');document.getElementById('sel').textContent='Approve: '+Object.entries(picks).map(([k,v])=>k+'='+v).join(', ');}}</script></body></html>"""
+<script>const picks={{}},notes={{}};function refresh(){{const p=Object.entries(picks).map(([k,v])=>k+'='+v).join(', ');const n=Object.entries(notes).filter(([,v])=>v).map(([k,v])=>k+': '+v).join(' | ');document.getElementById('sel').textContent=(p?'Approve: '+p:'')+(p&&n?' · ':'')+(n?'Notes: '+n:'')||'No takes selected';}}function pick(s,t,btn){{picks[s]=t;document.querySelectorAll(`.take[data-shot="${{s}}"]`).forEach(e=>e.classList.remove('picked'));btn.closest('.take').classList.add('picked');refresh();}}function note(s,v){{notes[s]=v;refresh();}}</script></body></html>"""
     with open(out, "w", encoding="utf-8") as f:
         f.write(page)
     return out
