@@ -87,6 +87,7 @@ def main():
             import studio_board
             studio_board.build_script_board(bd_path, out_html=os.path.join(a.dir, "callsheets", f"{a.episode}_script_board.html"))
             studio_board.build_screenplay_board(a.script, out_html=os.path.join(a.dir, "callsheets", f"{a.episode}_screenplay.html"))
+            studio_board.refresh_hub(a.dir, episode=a.episode, script_path=a.script)
         except Exception:
             pass
     for x in out: print(f"{x['scene']}  {x['heading'][:48]:48s} ~{x['estimated_seconds']:3d}s  clips={x['estimated_clips']}  cast={list(x['characters'])}")

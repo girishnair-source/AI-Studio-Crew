@@ -197,6 +197,11 @@ def main():
                "one_line": f"{len(locked)}/{len(shots)} shots locked, {budget['rolls']} rolls, {len(causes)} escalation type(s)"}
     json.dump(summary, open(os.path.join(scene_dir, "scene_summary.json"), "w"), indent=2)
     telemetry.end(parent, "ok" if not summary["escalations"] else "partial", rolls=budget["rolls"], locked=len(locked), escalations=len(summary["escalations"]))
+    try:
+        import studio_board
+        studio_board.refresh_hub(a.production)
+    except Exception:
+        pass
     # chat-facing output: URIs + one-liners only
     print(json.dumps({"scene": a.scene, "summary": os.path.join(scene_dir, "scene_summary.json"), "one_line": summary["one_line"],
                       "locked": [f"{l['shot']} → {l['take']}" for l in locked],

@@ -450,6 +450,15 @@ def scene(d, profile="dialogue", manifest=None, no_llm=False):
         wer_s = f"  wer={wer}" if wer is not None else ""
         print(f"{k:28s} {r['duration']:5.1f}s  speech_end={r.get('speech_end')}  margin={r.get('margin')}{wer_s}  flags={r['flags']}")
     build_board(d)
+    try:
+        proto_dir = os.path.abspath(os.path.join(HERE, "..", "..", "studio-protocol", "scripts"))
+        if proto_dir not in sys.path:
+            sys.path.insert(0, proto_dir)
+        import studio_board
+        prod_dir = os.path.dirname(os.path.dirname(os.path.abspath(d.rstrip("/"))))
+        studio_board.refresh_hub(prod_dir)
+    except Exception:
+        pass
     return rep
 
 

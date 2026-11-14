@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""studio_board.py — HTML review boards for Script Breakdown, Screenplay, Storyboard, Dailies & Provenance, plus live note server.
+"""studio_board.py — Unified Single-Page Production Status Dashboard & Studio Hub.
 
-  studio_board.py script     --breakdown production/callsheets/EP01_breakdown.json [--out script_board.html]
-  studio_board.py screenplay --script script.txt [--shotlists ...] [--out screenplay_board.html]
-  studio_board.py storyboard --shotlist production/callsheets/EP01_SC04.shotlist.json [--dailies ...] [--out storyboard_board.html] [--embed]
-  studio_board.py hub        --production production --episode EP01 [--script script.txt] [--out production/EP01_studio_hub.html] [--embed]
+Combines Pipeline Progress Bar, Stage Stepper, Scene Readiness Matrix, Cast Bible Status,
+Director Action Inbox (Escalations), Script Breakdown, Screenplay, Storyboard, Video Dailies,
+and Cuts/Masters into ONE HTML page (`production/studio_hub.html`).
+
+  studio_board.py hub        --production production [--episode EP01] [--script script.txt] [--out production/studio_hub.html] [--embed]
   studio_board.py serve      --production production [--episode EP01] [--port 8765]   # live two-way UI -> director_notes.json
+  studio_board.py script     --breakdown production/callsheets/EP01_breakdown.json [--out ...]
+  studio_board.py screenplay --script script.txt [--shotlists ...] [--out ...]
+  studio_board.py storyboard --shotlist production/callsheets/EP01_SC04.shotlist.json [--dailies ...] --out ...
 """
-import argparse, base64, glob, html as H, http.server, json, os, re, sys, urllib.parse
+import argparse, base64, glob, html as H, http.server, json, os, re, sys, time, urllib.parse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
@@ -16,28 +20,62 @@ import contracts  # noqa: E402
 import provenance  # noqa: E402
 
 SHARED_CSS = """
-:root { --bg:#0d0f12; --panel:#161920; --panel2:#1d212b; --border:#2a303d; --text:#eef2f6; --muted:#94a3b8; --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --purple:#a855f7; }
+:root { --bg:#0b0d11; --panel:#141821; --panel2:#1b202c; --border:#283041; --text:#eef2f6; --muted:#94a3b8; --accent:#3b82f6; --amber:#f59e0b; --green:#22c55e; --red:#ef4444; --purple:#a855f7; }
 * { box-sizing:border-box; }
-body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); margin:0; padding:24px 32px; line-height:1.5; }
-.topbar { position:sticky; top:12px; z-index:20; background:rgba(22,25,32,0.95); backdrop-filter:blur(10px); border:1px solid var(--border); border-radius:12px; padding:14px 20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; box-shadow:0 8px 24px rgba(0,0,0,0.4); }
-.title-grp h1 { font-size:18px; margin:0; font-weight:700; letter-spacing:-0.01em; }
+body { font-family:'Inter',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--text); margin:0; padding:20px 28px 48px; line-height:1.5; }
+.topbar { position:sticky; top:10px; z-index:30; background:rgba(20,24,33,0.96); backdrop-filter:blur(12px); border:1px solid var(--border); border-radius:14px; padding:14px 18px; margin-bottom:20px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,0.45); }
+.top-row { display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; }
+.title-grp h1 { font-size:18px; margin:0; font-weight:700; letter-spacing:-0.01em; display:flex; align-items:center; gap:8px; }
 .title-grp .sub { font-size:12px; color:var(--muted); margin-top:2px; }
-.tabs { display:flex; gap:6px; background:#0b0d10; padding:4px; border-radius:9px; border:1px solid var(--border); }
-.tab-btn { background:transparent; color:var(--muted); border:0; padding:7px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+.tabs { display:flex; gap:5px; background:#090b0f; padding:4px; border-radius:10px; border:1px solid var(--border); flex-wrap:wrap; }
+.tab-btn { background:transparent; color:var(--muted); border:0; padding:6px 12px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+.tab-btn:hover { color:var(--text); }
 .tab-btn.active { background:var(--accent); color:#fff; }
-.top-right { display:flex; align-items:center; gap:10px; }
-.status-pill { font-family:ui-monospace,monospace; font-size:12px; background:#0b0d10; border:1px solid var(--border); padding:6px 12px; border-radius:8px; color:#cbd5e1; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.save-btn { background:var(--accent); color:#fff; border:0; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
-.save-btn:hover { opacity:0.92; }
+.top-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.status-pill { font-family:ui-monospace,monospace; font-size:12px; background:#090b0f; border:1px solid var(--border); padding:6px 12px; border-radius:8px; color:#cbd5e1; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.save-btn { background:var(--accent); color:#fff; border:0; padding:7px 13px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; }
+.ghost-btn { background:var(--panel2); color:#cbd5e1; border:1px solid var(--border); padding:7px 11px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; }
+
+/* Master Progress Bar & Pipeline Stepper */
+.prog-wrap { display:flex; align-items:center; gap:14px; }
+.prog-track { flex:1; height:10px; background:#090b0f; border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+.prog-fill { height:100%; background:linear-gradient(90deg, #3b82f6, #22c55e); border-radius:999px; transition:width 0.3s ease; }
+.prog-pct { font-size:13px; font-weight:700; color:#f8fafc; min-width:130px; text-align:right; }
+
+.stepper { display:grid; grid-template-columns:repeat(6, minmax(130px, 1fr)); gap:10px; margin-bottom:22px; }
+.step-card { background:var(--panel); border:1px solid var(--border); border-radius:11px; padding:12px 14px; display:flex; flex-direction:column; gap:4px; cursor:pointer; transition:transform 0.12s, border-color 0.12s; }
+.step-card:hover { transform:translateY(-1px); border-color:#475569; }
+.step-card.st-done { border-color:rgba(34,197,94,0.45); background:linear-gradient(180deg, rgba(34,197,94,0.08), var(--panel)); }
+.step-card.st-active { border-color:rgba(59,130,246,0.65); background:linear-gradient(180deg, rgba(59,130,246,0.12), var(--panel)); }
+.step-card.st-warn { border-color:rgba(245,158,11,0.65); background:linear-gradient(180deg, rgba(245,158,11,0.12), var(--panel)); }
+.step-top { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:700; }
+.step-sub { font-size:11px; color:var(--muted); }
+
+/* Overview Matrix & Cards */
+.sec-hdr { display:flex; justify-content:space-between; align-items:center; margin:22px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+.sec-hdr h2 { margin:0; font-size:16px; display:flex; align-items:center; gap:8px; }
+.alert-box { background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.45); border-left:4px solid var(--amber); border-radius:10px; padding:14px 16px; margin-bottom:18px; }
+.alert-box h3 { margin:0 0 8px; font-size:14px; color:#fcd34d; }
+.matrix-table { width:100%; border-collapse:separate; border-spacing:0; background:var(--panel); border:1px solid var(--border); border-radius:12px; overflow:hidden; font-size:13px; margin-bottom:22px; }
+.matrix-table th { text-align:left; padding:11px 14px; background:var(--panel2); color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border); }
+.matrix-table td { padding:12px 14px; border-bottom:1px solid #1e2432; vertical-align:middle; }
+.matrix-table tr:last-child td { border-bottom:0; }
+.mini-bar { width:110px; height:7px; background:#090b0f; border-radius:99px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px; border:1px solid var(--border); }
+.mini-fill { height:100%; background:linear-gradient(90deg, #3b82f6, #22c55e); }
+.cast-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:12px; margin-bottom:22px; }
+.cast-card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:10px 12px; display:flex; align-items:center; gap:12px; }
+.cast-avatar { width:48px; height:48px; border-radius:8px; background:#090b0f; border:1px solid var(--border); object-fit:cover; display:flex; align-items:center; justify-content:center; font-weight:700; color:var(--muted); flex-shrink:0; }
+
 .badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:0.02em; }
 .b-blue { background:rgba(59,130,246,0.16); color:#93c5fd; border:1px solid rgba(59,130,246,0.35); }
 .b-amber { background:rgba(245,158,11,0.16); color:#fcd34d; border:1px solid rgba(245,158,11,0.35); }
 .b-green { background:rgba(34,197,94,0.16); color:#86efac; border:1px solid rgba(34,197,94,0.35); }
 .b-red { background:rgba(239,68,68,0.16); color:#fca5a5; border:1px solid rgba(239,68,68,0.35); }
 .b-purple { background:rgba(168,85,247,0.16); color:#d8b4fe; border:1px solid rgba(168,85,247,0.35); }
-.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:22px; }
-.kpi { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
-.kpi .k-val { font-size:22px; font-weight:700; }
+.b-muted { background:#181d27; color:#94a3b8; border:1px solid #283041; }
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:20px; }
+.kpi { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:13px 15px; }
+.kpi .k-val { font-size:21px; font-weight:700; }
 .kpi .k-lbl { font-size:12px; color:var(--muted); }
 
 /* Comment & Provenance Drawer */
@@ -59,7 +97,7 @@ details.prov pre { white-space:pre-wrap; word-break:break-word; color:#cbd5e1; b
 .cast-row { display:flex; flex-wrap:wrap; gap:6px; }
 
 /* Screenplay */
-.sp-wrap { max-width:860px; margin:0 auto; background:#14171f; border:1px solid var(--border); border-radius:12px; padding:40px 56px; box-shadow:0 12px 36px rgba(0,0,0,0.45); font-family:'Courier Prime','Courier New',Courier,monospace; font-size:15px; line-height:1.55; }
+.sp-wrap { max-width:860px; margin:0 auto; background:#14171f; border:1px solid var(--border); border-radius:12px; padding:36px 52px; box-shadow:0 12px 36px rgba(0,0,0,0.45); font-family:'Courier Prime','Courier New',Courier,monospace; font-size:15px; line-height:1.55; }
 .sp-slug { font-weight:700; text-transform:uppercase; color:#f8fafc; background:#1e2433; padding:6px 12px; border-left:4px solid var(--accent); margin:28px 0 14px; letter-spacing:0.04em; display:flex; justify-content:space-between; }
 .sp-slug:first-child { margin-top:0; }
 .sp-action { color:#e2e8f0; margin:10px 0; }
@@ -93,7 +131,12 @@ details.prov pre { white-space:pre-wrap; word-break:break-word; color:#cbd5e1; b
 .btn { border:1px solid var(--border); background:var(--panel2); color:var(--text); padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; flex:1; }
 .btn-ok:hover, .sb-card.approved .btn-ok { background:rgba(34,197,94,0.2); border-color:var(--green); color:#86efac; }
 .btn-flag:hover, .sb-card.flagged .btn-flag { background:rgba(239,68,68,0.2); border-color:var(--red); color:#fca5a5; }
+.pane-section-label { display:none; margin:28px 0 14px; padding:10px 14px; background:var(--panel2); border-left:4px solid var(--accent); border-radius:6px; font-size:15px; font-weight:700; }
+body.all-in-one .tab-pane { display:block !important; margin-bottom:34px; }
+body.all-in-one .pane-section-label { display:block; }
 """
+
+STATUS_ICON = {"done": "✅", "active": "🔄", "warn": "⚠️", "pending": "⏳"}
 
 
 def _img_uri(path, out_html, embed=False):
@@ -152,8 +195,252 @@ def _prov_drawer(prompt_txt, model_lbl, refs, characters=(), stale_msg=""):
     )
 
 
+def compute_production_state(production_dir, episode, bd, cs_map, sls):
+    """Compute intuitive 6-stage pipeline progress, per-scene readiness, cast bible status, and active escalations."""
+    bible_chars_dir = os.path.join(production_dir, "bible", "characters")
+    bible_voices_dir = os.path.join(production_dir, "bible", "voices")
+    dailies_root = os.path.join(production_dir, "dailies")
+    cuts = sorted(glob.glob(os.path.join(production_dir, "cuts", f"*{episode}*.mp4"))) or sorted(glob.glob(os.path.join(production_dir, "cuts", "*.mp4")))
+    masters = sorted(glob.glob(os.path.join(production_dir, "masters", f"*{episode}*.mp4"))) or sorted(glob.glob(os.path.join(production_dir, "masters", "*.mp4")))
+
+    # Discover all scene IDs across breakdown, callsheets, shotlists, and dailies
+    scene_keys = []
+    for s in bd.get("scenes", []):
+        sc = s.get("scene", "")
+        full = sc if sc.startswith(episode) else f"{episode}_{sc}"
+        if full not in scene_keys:
+            scene_keys.append((full, sc, s.get("heading", "")))
+    for sl in sls:
+        sc = sl.get("scene", "")
+        if sc and not any(k[0] == sc or k[1] == sc for k in scene_keys):
+            scene_keys.append((sc, sc, "ShotList Scene"))
+
+    sl_by_scene = {}
+    for sl in sls:
+        sl_by_scene[sl.get("scene", "")] = sl
+
+    # Characters from breakdown + shotlists + bible dir
+    char_names = set()
+    for s in bd.get("scenes", []):
+        for c in (s.get("characters") or {}):
+            char_names.add(c.lower())
+    for sl in sls:
+        for sh in sl.get("shots", []):
+            for c in sh.get("characters", []):
+                char_names.add(c.lower())
+            for d in sh.get("dialogue", []):
+                if d.get("speaker"):
+                    char_names.add(d["speaker"].lower())
+    if os.path.isdir(bible_chars_dir):
+        for name in os.listdir(bible_chars_dir):
+            if os.path.isdir(os.path.join(bible_chars_dir, name)):
+                char_names.add(name.lower())
+
+    cast_status = []
+    for c in sorted(char_names):
+        front = os.path.join(bible_chars_dir, c, "front.png")
+        sheet = os.path.join(bible_chars_dir, c, "sheet.png")
+        voice = os.path.join(bible_voices_dir, c, "fingerprint.md")
+        cast_status.append({
+            "name": c,
+            "front": front if os.path.exists(front) else "",
+            "has_look": os.path.exists(front) or os.path.exists(sheet),
+            "has_voice": os.path.exists(voice),
+        })
+
+    scene_rows = []
+    escalations = []
+    total_shots, rolled_shots, clean_shots = 0, 0, 0
+    for full_sc, short_sc, heading in scene_keys:
+        has_cs = (full_sc in cs_map) or (short_sc in cs_map) or os.path.exists(os.path.join(production_dir, "callsheets", f"{full_sc}.md"))
+        sl = sl_by_scene.get(full_sc) or sl_by_scene.get(short_sc)
+        n_shots = len(sl.get("shots", [])) if sl else 0
+        total_shots += n_shots
+
+        sc_dl = os.path.join(dailies_root, full_sc)
+        if not os.path.isdir(sc_dl) and os.path.isdir(os.path.join(dailies_root, short_sc)):
+            sc_dl = os.path.join(dailies_root, short_sc)
+        mp4s = glob.glob(os.path.join(sc_dl, "*.mp4")) if os.path.isdir(sc_dl) else []
+        rolled_shot_ids = {re.sub(r"_take\d+\.mp4$", "", os.path.basename(p)) for p in mp4s}
+        n_rolled = len(rolled_shot_ids)
+        rolled_shots += n_rolled
+
+        qc_p = os.path.join(sc_dl, "qc.json")
+        qc = json.load(open(qc_p, encoding="utf-8")) if os.path.exists(qc_p) else {}
+        flagged_takes = sum(1 for v in qc.values() if v.get("flags"))
+        clean_take_shots = {re.sub(r"_take\d+\.mp4$", "", k) for k, v in qc.items() if not v.get("flags")}
+        clean_shots += len(clean_take_shots)
+
+        sc_escs = []
+        for ep in sorted(glob.glob(os.path.join(sc_dl, "escalations", "*.json"))):
+            try:
+                eobj = json.load(open(ep, encoding="utf-8"))
+                if not eobj.get("resolved"):
+                    sc_escs.append(eobj)
+                    escalations.append(eobj)
+            except Exception:
+                pass
+
+        # Compute scene % across 4 milestones: CallSheet (20%) + ShotList (30%) + Rolls (30%) + QC/Lock (20%)
+        pct = (20 if has_cs else 0) + (30 if sl else 0)
+        if n_shots > 0:
+            pct += int(30 * min(1.0, n_rolled / n_shots))
+            pct += int(20 * min(1.0, len(clean_take_shots) / n_shots))
+        elif mp4s:
+            pct += 50
+
+        scene_rows.append({
+            "scene": full_sc,
+            "heading": heading,
+            "has_cs": has_cs,
+            "has_sl": bool(sl),
+            "n_shots": n_shots,
+            "n_rolled": n_rolled,
+            "n_takes": len(mp4s),
+            "qc_done": bool(qc),
+            "flagged_takes": flagged_takes,
+            "escalations": len(sc_escs),
+            "pct": min(100, pct),
+        })
+
+    # 6 Pipeline Stages
+    has_script = bool(bd.get("scenes") or cs_map)
+    st1 = ("done", f"{len(scene_rows)} scene(s)") if has_script else ("pending", "Awaiting script")
+
+    if not cast_status:
+        st2 = ("pending", "No cast yet")
+    elif all(c["has_look"] for c in cast_status):
+        st2 = ("done", f"{len(cast_status)}/{len(cast_status)} locked")
+    elif any(c["has_look"] or c["has_voice"] for c in cast_status):
+        st2 = ("active", f"{sum(1 for c in cast_status if c['has_look'])}/{len(cast_status)} cast")
+    else:
+        st2 = ("warn", f"{len(cast_status)} need refs")
+
+    if sls and len(sls) >= max(1, len(bd.get("scenes", []))):
+        st3 = ("done", f"{total_shots} shot(s) planned")
+    elif sls:
+        st3 = ("active", f"{len(sls)} scene(s) boarded")
+    else:
+        st3 = ("pending", "Not boarded yet")
+
+    if escalations:
+        st4 = ("warn", f"{len(escalations)} escalation(s)")
+    elif total_shots > 0 and rolled_shots >= total_shots:
+        st4 = ("done", f"{rolled_shots}/{total_shots} shots rolled")
+    elif rolled_shots > 0:
+        st4 = ("active", f"{rolled_shots}/{max(total_shots, rolled_shots)} rolled")
+    else:
+        st4 = ("pending", "Cameras idle")
+
+    st5 = ("done", f"{len(cuts)} cut(s)") if cuts else ("pending", "No cut yet")
+    st6 = ("done", f"{len(masters)} master(s)") if masters else ("pending", "Not delivered")
+
+    stages = [
+        {"id": "script", "num": 1, "name": "Script & Breakdown", "state": st1[0], "detail": st1[1], "tab": "script"},
+        {"id": "bible", "num": 2, "name": "Cast & Voice Bible", "state": st2[0], "detail": st2[1], "tab": "overview"},
+        {"id": "storyboard", "num": 3, "name": "Storyboard & Prompts", "state": st3[0], "detail": st3[1], "tab": "storyboard"},
+        {"id": "dailies", "num": 4, "name": "Camera & Dailies QC", "state": st4[0], "detail": st4[1], "tab": "dailies"},
+        {"id": "edit", "num": 5, "name": "Edit, Grade & Mix", "state": st5[0], "detail": st5[1], "tab": "cuts"},
+        {"id": "master", "num": 6, "name": "Master Delivery", "state": st6[0], "detail": st6[1], "tab": "cuts"},
+    ]
+    weights = {"done": 1.0, "active": 0.5, "warn": 0.5, "pending": 0.0}
+    overall_pct = int(round(100 * sum(weights[s["state"]] for s in stages) / len(stages)))
+    return {
+        "overall_pct": overall_pct,
+        "stages": stages,
+        "scene_rows": scene_rows,
+        "cast_status": cast_status,
+        "escalations": escalations,
+        "cuts_count": len(cuts),
+        "masters_count": len(masters),
+    }
+
+
+def render_overview_section(state, out_html, embed=False):
+    """Render Pipeline Stepper, Active Escalations, Scene Readiness Matrix, and Cast Bible strip."""
+    # 1. 6-Stage Stepper
+    step_cards = []
+    for st in state["stages"]:
+        ico = STATUS_ICON[st["state"]]
+        step_cards.append(
+            f"<div class='step-card st-{st['state']}' onclick=\"showTab('{st['tab']}', document.querySelector(`[data-tab='{st['tab']}']`))\"><div class='step-top'><span>{st['num']}. {H.escape(st['name'])}</span><span>{ico}</span></div>"
+            f"<div class='step-sub'>{H.escape(st['detail'])}</div>"
+            f"</div>"
+        )
+    stepper_html = f"<div class='stepper'>{''.join(step_cards)}</div>"
+
+    # 2. Active Escalations Banner (if any)
+    esc_html = ""
+    if state["escalations"]:
+        items = []
+        for e in state["escalations"]:
+            opts = " / ".join(f"<strong>{H.escape(o['key'])}</strong>: {H.escape(o['label'])}" for o in e.get("options", []))
+            items.append(
+                f"<div style='margin-bottom:8px'><strong>{H.escape(e.get('scene',''))} · Shot {H.escape(e.get('shot',''))}</strong> "
+                f"<span class='badge b-red'>{H.escape(e.get('reason_code',''))}</span> — {H.escape(e.get('question',''))}<br>"
+                f"<span style='font-size:12px;color:#cbd5e1'>Options: {opts}</span></div>"
+            )
+        esc_html = f"<div class='alert-box'><h3>⚠️ Needs Director Decision ({len(state['escalations'])})</h3>{''.join(items)}</div>"
+
+    # 3. Scene-by-Scene Readiness Matrix
+    rows_html = []
+    for r in state["scene_rows"]:
+        cs_ico = "✅ Ready" if r["has_cs"] else "⏳ Pending"
+        sl_ico = f"✅ {r['n_shots']} shots" if r["has_sl"] else "⏳ Pending"
+        if r["n_shots"] > 0 and r["n_rolled"] >= r["n_shots"]:
+            cam_ico = f"✅ {r['n_rolled']}/{r['n_shots']} ({r['n_takes']} takes)"
+        elif r["n_rolled"] > 0:
+            cam_ico = f"🔄 {r['n_rolled']}/{max(r['n_shots'], r['n_rolled'])} ({r['n_takes']} takes)"
+        else:
+            cam_ico = "⏳ 0 rolled"
+
+        if r["escalations"]:
+            qc_badge = f"<span class='badge b-red'>⚠️ {r['escalations']} escalated</span>"
+        elif r["qc_done"] and r["flagged_takes"] == 0 and r["n_takes"] > 0:
+            qc_badge = "<span class='badge b-green'>✅ All clean</span>"
+        elif r["qc_done"]:
+            qc_badge = f"<span class='badge b-amber'>⚠️ {r['flagged_takes']} flagged</span>"
+        else:
+            qc_badge = "<span class='badge b-muted'>⏳ Not run</span>"
+
+        rows_html.append(
+            f"<tr>"
+            f"<td><strong>{H.escape(r['scene'])}</strong><div style='font-size:11px;color:var(--muted)'>{H.escape(r['heading'])}</div></td>"
+            f"<td>{cs_ico}</td>"
+            f"<td>{sl_ico}</td>"
+            f"<td>{cam_ico}</td>"
+            f"<td>{qc_badge}</td>"
+            f"<td><div class='mini-bar'><div class='mini-fill' style='width:{r['pct']}%'></div></div><strong>{r['pct']}%</strong></td>"
+            f"</tr>"
+        )
+    matrix_html = (
+        "<div class='sec-hdr'><h2>📊 Scene Production Tracker</h2></div>"
+        "<table class='matrix-table'><thead><tr>"
+        "<th>Scene</th><th>CallSheet</th><th>Storyboard</th><th>Camera Rolls</th><th>QC & Continuity</th><th>Progress</th>"
+        "</tr></thead><tbody>"
+        + ("".join(rows_html) or "<tr><td colspan='6' style='color:var(--muted)'>No scenes broken down yet.</td></tr>")
+        + "</tbody></table>"
+    )
+
+    # 4. Cast & Voice Bible Readiness
+    cast_cards = []
+    for c in state["cast_status"]:
+        uri = _img_uri(c["front"], out_html, embed=embed) if c["front"] else ""
+        av = f"<img class='cast-avatar' src='{uri}'/>" if uri else f"<div class='cast-avatar'>{H.escape(c['name'][:2].upper())}</div>"
+        look_b = "<span class='badge b-green'>✅ Look</span>" if c["has_look"] else "<span class='badge b-amber'>⏳ Look</span>"
+        voice_b = "<span class='badge b-green'>🎙️ Voice</span>" if c["has_voice"] else "<span class='badge b-muted'>⏳ Voice</span>"
+        cast_cards.append(
+            f"<div class='cast-card'>{av}<div><div style='font-weight:700;text-transform:capitalize'>{H.escape(c['name'])}</div>"
+            f"<div style='margin-top:4px;display:flex;gap:4px'>{look_b}{voice_b}</div></div></div>"
+        )
+    cast_html = (
+        "<div class='sec-hdr'><h2>🎭 Cast & Voice Bible Status</h2></div>"
+        + (f"<div class='cast-grid'>{''.join(cast_cards)}</div>" if cast_cards else "<div style='color:var(--muted);font-size:13px'>No characters registered yet.</div>")
+    )
+    return stepper_html + esc_html + matrix_html + cast_html
+
+
 def render_script_section(breakdown, callsheets=None, existing_notes=None):
-    """Render inner HTML for the Script Breakdown tab/page."""
     callsheets = callsheets or {}
     scenes = breakdown.get("scenes", [])
     total_s = breakdown.get("total_estimated_seconds") or sum(s.get("estimated_seconds", 0) for s in scenes)
@@ -188,12 +475,12 @@ def render_script_section(breakdown, callsheets=None, existing_notes=None):
             )
         cast_badges = "".join(
             f"<span class='badge b-blue'>{H.escape(c)} · {w}w</span>" for c, w in (s.get("characters") or {}).items()
-        ) or "<span class='badge'>Silent / Visual</span>"
+        ) or "<span class='badge b-muted'>Silent / Visual</span>"
         brief_html = f"<div style='color:var(--muted);font-size:13px'>{H.escape(cs.get('brief',''))}</div>" if cs.get("brief") else ""
         cards.append(
             f"<div class='scene-card'>"
             f"<div class='scene-head'>"
-            f"<div class='scene-slug'>{H.escape(sc_id)} — {H.escape(s.get('heading',''))}</div>"
+            f"<div class='scene-slug'>📜 {H.escape(sc_id)} — {H.escape(s.get('heading',''))}</div>"
             f"<div><span class='badge b-amber'>~{s.get('estimated_seconds',0)}s</span> "
             f"<span class='badge b-purple'>{s.get('estimated_clips',1)} clip(s)</span> "
             f"<span class='badge b-green'>{H.escape(cs.get('mode','dailies'))}</span></div>"
@@ -207,7 +494,6 @@ def render_script_section(breakdown, callsheets=None, existing_notes=None):
 
 
 def render_screenplay_section(script_text, shotlists=None):
-    """Render Fountain-style screenplay with optional DOP subtext/objective annotations."""
     subtext_by_speaker = {}
     for sl in (shotlists or []):
         for sh in sl.get("shots", []):
@@ -265,7 +551,6 @@ def render_screenplay_section(script_text, shotlists=None):
 
 
 def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=None, production_dir=None, existing_notes=None, embed=False):
-    """Render visual Storyboard cards with comment inputs & compiled prompt/resource drawers."""
     sections = []
     prod = production_dir or (os.path.dirname(os.path.abspath(dailies_root.rstrip("/"))) if dailies_root else "production")
     bible = bible_dir or os.path.join(prod, "bible")
@@ -300,8 +585,11 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
                         break
             uri = _img_uri(img_path, out_html, embed=embed)
 
-            # Check if an actual rolled video provenance exists, else show compiled prompt
-            rolled_meta = provenance.inspect_asset(os.path.join(sc_dailies, f"{sid}_take1.mp4"), production_dir=prod)
+            vid_candidates = sorted(glob.glob(os.path.join(sc_dailies, f"{sid}_take*.mp4")))
+            vid_uri = _media_uri(vid_candidates[-1], out_html) if vid_candidates else ""
+            status_ico = "🎥" if vid_candidates else "📝"
+
+            rolled_meta = provenance.inspect_asset(vid_candidates[-1], production_dir=prod) if vid_candidates else None
             comp = compiled_by_id.get(sid, {})
             prompt_txt = (rolled_meta or {}).get("prompt") or comp.get("prompt", "")
             model_lbl = f"{rolled_meta['model']} ({rolled_meta['lane']})" if rolled_meta and rolled_meta.get("model") else f"Planned ({sl.get('resolution','720p')})"
@@ -314,6 +602,8 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
                         stale_msg = f"{os.path.basename(r['path'])} updated — reroll needed"
 
             badges = [f"<span class='badge b-blue'>{s['duration_s']}s</span>"]
+            if vid_candidates:
+                badges.append(f"<span class='badge b-green'>✅ {len(vid_candidates)} take(s)</span>")
             if s.get("chain_from"):
                 badges.append(f"<span class='badge b-purple'>⛓ {H.escape(s['chain_from'])}</span>")
             if tp:
@@ -337,9 +627,6 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
                     f"{_style_inline_tags(d['line'])}</div>"
                 )
 
-            # Prefer inline <video> if a rolled take exists for this shot!
-            vid_candidates = sorted(glob.glob(os.path.join(sc_dailies, f"{sid}_take*.mp4")))
-            vid_uri = _media_uri(vid_candidates[-1], out_html) if vid_candidates else ""
             poster_attr = f" poster='{uri}'" if uri else ""
             if vid_uri:
                 frame_inner = f"<video controls playsinline preload='metadata'{poster_attr} src='{vid_uri}'></video>"
@@ -352,7 +639,7 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
                 cam_overlay = f"<div class='sb-cam-overlay'>🎥 {H.escape(s.get('camera',''))}</div>"
             cards.append(
                 f"<div class='sb-card{' tp' if tp else ''}{init_cls}' data-shot='{H.escape(target_key)}'>"
-                f"<div class='sb-hdr'><strong>Shot {H.escape(sid)}</strong><div>{' '.join(badges)}</div></div>"
+                f"<div class='sb-hdr'><strong>{status_ico} Shot {H.escape(sid)}</strong><div>{' '.join(badges)}</div></div>"
                 f"<div class='sb-frame {ar_cls}'>{frame_inner}{cam_overlay}</div>"
                 f"<div class='sb-body'>"
                 f"<div style='font-size:11px;color:var(--muted)'>🎥 {H.escape(s.get('camera',''))}</div>"
@@ -372,11 +659,12 @@ def render_storyboard_section(shotlists, out_html, dailies_root=None, bible_dir=
             f"<span style='font-size:12px;color:var(--muted)'>Style: {H.escape(sl.get('style',''))}</span></div>"
             f"<div class='sb-grid'>{''.join(cards)}</div></div>"
         )
+    if not sections:
+        return "<div class='scene-card' style='color:var(--muted)'>⏳ No ShotLists authored yet. Once DOP writes `.shotlist.json`, storyboard panels appear here.</div>"
     return "".join(sections)
 
 
 def render_dailies_section(production_dir, episode, out_html, existing_notes=None, embed=False, embed_video=False):
-    """Render all rolled video takes across scenes for `episode` with inline HTML5 <video> playback."""
     dailies_root = os.path.join(production_dir, "dailies")
     scene_dirs = sorted(glob.glob(os.path.join(dailies_root, f"{episode}*")))
     if not scene_dirs and os.path.isdir(dailies_root):
@@ -403,7 +691,7 @@ def render_dailies_section(production_dir, episode, out_html, existing_notes=Non
             poster_attr = f" poster='{poster_uri}'" if poster_uri else ""
 
             flags = info.get("flags") or []
-            badges = [f"<span class='badge b-red'>{H.escape(fl)}</span>" for fl in flags] or ["<span class='badge b-green'>CLEAN</span>"]
+            badges = [f"<span class='badge b-red'>⚠️ {H.escape(fl)}</span>" for fl in flags] or ["<span class='badge b-green'>✅ CLEAN</span>"]
             if info.get("duration"):
                 badges.insert(0, f"<span class='badge b-blue'>{info['duration']}s</span>")
 
@@ -442,12 +730,11 @@ def render_dailies_section(production_dir, episode, out_html, existing_notes=Non
             f"<div class='sb-grid'>{''.join(cards)}</div></div>"
         )
     if not sections:
-        return "<div class='scene-card' style='color:var(--muted)'>No video takes rolled in <code>production/dailies/</code> yet. Once Camera rolls, playable takes appear here automatically.</div>"
+        return "<div class='scene-card' style='color:var(--muted)'>⏳ No video takes rolled in <code>production/dailies/</code> yet. Once Camera rolls, playable takes appear here automatically.</div>"
     return "".join(sections)
 
 
 def render_cuts_section(production_dir, episode, out_html, embed_video=False):
-    """Render assembled cuts and delivered masters with full HTML5 <video> playback."""
     vids = []
     for label, sub in (("Cut", "cuts"), ("Master", "masters")):
         d = os.path.join(production_dir, sub)
@@ -455,23 +742,33 @@ def render_cuts_section(production_dir, episode, out_html, embed_video=False):
             if episode.lower() in os.path.basename(p).lower() or not glob.glob(os.path.join(d, f"*{episode}*.mp4")):
                 vids.append((label, p))
     if not vids:
-        return "<div class='scene-card' style='color:var(--muted)'>No assembled cuts or masters in <code>production/cuts/</code> or <code>production/masters/</code> yet.</div>"
+        return "<div class='scene-card' style='color:var(--muted)'>⏳ No assembled cuts or masters in <code>production/cuts/</code> or <code>production/masters/</code> yet.</div>"
     cards = []
     for label, vp in vids:
         vname = os.path.basename(vp)
         vid_uri = _media_uri(vp, out_html, embed_video=embed_video)
         sz_mb = round(os.path.getsize(vp) / (1024 * 1024), 2)
+        ico = "🏆" if label == "Master" else "✂️"
         cards.append(
             f"<div class='sb-card'>"
-            f"<div class='sb-hdr'><strong>🎞 {H.escape(vname)}</strong><div><span class='badge b-purple'>{label}</span> <span class='badge b-blue'>{sz_mb} MB</span></div></div>"
+            f"<div class='sb-hdr'><strong>{ico} {H.escape(vname)}</strong><div><span class='badge b-purple'>{label}</span> <span class='badge b-blue'>{sz_mb} MB</span></div></div>"
             f"<video class='vid-player' controls playsinline preload='metadata' src='{vid_uri}'></video>"
             f"</div>"
         )
     return f"<div class='sb-grid'>{''.join(cards)}</div>"
 
 
-def _wrap_page(title, subtitle, body_html, tabs_html="", status_default="Add notes or votes — auto-applied on next roll", initial_notes=None):
+def _wrap_page(title, subtitle, body_html, tabs_html="", progress_pct=None, status_default="Add notes or votes — auto-applied on next roll", initial_notes=None):
     init_json = json.dumps(initial_notes or {})
+    prog_html = ""
+    if progress_pct is not None:
+        prog_html = (
+            f"<div class='prog-wrap'>"
+            f"<div class='prog-track'><div class='prog-fill' style='width:{progress_pct}%'></div></div>"
+            f"<div class='prog-pct'>{progress_pct}% Complete</div>"
+            f"</div>"
+        )
+    all_btn = "<button class='ghost-btn' id='allInOneBtn' onclick='toggleAllInOne()'>↕ Show All on One Page</button>" if tabs_html else ""
     js = f"""
 document.addEventListener('play', function(e) {{
   document.querySelectorAll('video').forEach(function(v) {{ if (v !== e.target) v.pause(); }});
@@ -502,7 +799,7 @@ async function persistNotes(silent) {{
   try {{
     if (location.protocol.startsWith('http')) {{
       const r = await fetch('/api/notes', {{method:'POST', headers:{{'Content-Type':'application/json'}}, body:JSON.stringify({{notes: directorNotes}})}});
-      if (r.ok) {{ pill.textContent = '✓ Saved to director_notes.json (will apply on next roll)'; return; }}
+      if (r.ok) {{ pill.textContent = '✅ Saved to director_notes.json'; return; }}
     }}
   }} catch (e) {{}}
   if (silent) return;
@@ -514,19 +811,28 @@ async function persistNotes(silent) {{
   pill.textContent = 'Downloaded director_notes.json (place in production/callsheets/)';
 }}
 function showTab(id, btn) {{
+  document.body.classList.remove('all-in-one');
+  const ab = document.getElementById('allInOneBtn');
+  if (ab) ab.textContent = '↕ Show All on One Page';
   document.querySelectorAll('video').forEach(v => v.pause());
   document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
-  document.getElementById('pane-' + id).style.display = 'block';
+  const pane = document.getElementById('pane-' + id);
+  if (pane) pane.style.display = 'block';
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+}}
+function toggleAllInOne() {{
+  const on = document.body.classList.toggle('all-in-one');
+  const ab = document.getElementById('allInOneBtn');
+  if (ab) ab.textContent = on ? '🗂 Tabbed View' : '↕ Show All on One Page';
 }}
 """
     return (
         f"<!doctype html><html><head><meta charset='utf-8'><title>{H.escape(title)}</title>"
         f"<style>{SHARED_CSS}</style></head><body>"
-        f"<div class='topbar'><div class='title-grp'><h1>{H.escape(title)}</h1><div class='sub'>{H.escape(subtitle)}</div></div>"
-        f"{tabs_html}<div class='top-right'><div class='status-pill' id='statusPill'>{H.escape(status_default)}</div>"
-        f"<button class='save-btn' onclick='persistNotes(false)'>💾 Save Notes to Studio</button></div></div>"
+        f"<div class='topbar'><div class='top-row'><div class='title-grp'><h1>🎬 {H.escape(title)}</h1><div class='sub'>{H.escape(subtitle)}</div></div>"
+        f"{tabs_html}<div class='top-right'>{all_btn}<div class='status-pill' id='statusPill'>{H.escape(status_default)}</div>"
+        f"<button class='save-btn' onclick='persistNotes(false)'>💾 Save Notes</button></div></div>{prog_html}</div>"
         f"{body_html}<script>{js}</script></body></html>"
     )
 
@@ -586,18 +892,23 @@ def build_storyboard_board(shotlist_paths, out_html, dailies_root=None, producti
 def build_hub(production_dir, episode="EP01", script_path=None, out_html=None, embed=False, embed_video=False):
     cs_dir = os.path.join(production_dir, "callsheets")
     dailies_root = os.path.join(production_dir, "dailies")
-    out_html = out_html or os.path.join(production_dir, f"{episode}_studio_hub.html")
+    out_html = out_html or os.path.join(production_dir, "studio_hub.html")
     notes = provenance.load_notes(production_dir).get("notes", {})
+
+    # Auto-detect episode if EP01_breakdown.json doesn't exist yet
+    bd_candidates = sorted(glob.glob(os.path.join(cs_dir, "*_breakdown.json")))
+    if not os.path.exists(os.path.join(cs_dir, f"{episode}_breakdown.json")) and bd_candidates:
+        episode = os.path.basename(bd_candidates[0]).split("_breakdown.json")[0]
 
     bd_path = os.path.join(cs_dir, f"{episode}_breakdown.json")
     bd = json.load(open(bd_path, encoding="utf-8")) if os.path.exists(bd_path) else {"episode": episode, "scenes": []}
     cs_map = {}
-    for p in sorted(glob.glob(os.path.join(cs_dir, f"{episode}*.callsheet.json"))):
+    for p in sorted(glob.glob(os.path.join(cs_dir, "*.callsheet.json"))):
         with open(p, encoding="utf-8") as f:
             c = json.load(f)
             cs_map[c.get("scene", "")] = c
     sls = []
-    for p in sorted(glob.glob(os.path.join(cs_dir, f"{episode}*.shotlist.json"))):
+    for p in sorted(glob.glob(os.path.join(cs_dir, "*.shotlist.json"))):
         with open(p, encoding="utf-8") as f:
             sls.append(json.load(f))
 
@@ -609,35 +920,55 @@ def build_hub(production_dir, episode="EP01", script_path=None, out_html=None, e
         for p in sorted(glob.glob(os.path.join(cs_dir, f"{episode}_SC*.md"))):
             with open(p, encoding="utf-8") as f:
                 chunks.append(f.read())
-        sp_txt = "\n\n".join(chunks) or "No script loaded."
+        sp_txt = "\n\n".join(chunks) or "No script loaded yet."
+
+    state = compute_production_state(production_dir, episode, bd, cs_map, sls)
+    st_by_id = {s["id"]: STATUS_ICON[s["state"]] for s in state["stages"]}
 
     tabs = (
         "<div class='tabs'>"
-        "<button class='tab-btn active' onclick=\"showTab('script',this)\">1. Script</button>"
-        "<button class='tab-btn' onclick=\"showTab('screenplay',this)\">2. Screenplay</button>"
-        "<button class='tab-btn' onclick=\"showTab('storyboard',this)\">3. Storyboard</button>"
-        "<button class='tab-btn' onclick=\"showTab('dailies',this)\">4. Dailies (Video)</button>"
-        "<button class='tab-btn' onclick=\"showTab('cuts',this)\">5. Cuts & Masters</button>"
+        f"<button class='tab-btn active' data-tab='overview' onclick=\"showTab('overview',this)\">📊 Overview</button>"
+        f"<button class='tab-btn' data-tab='script' onclick=\"showTab('script',this)\">{st_by_id['script']} 1. Script</button>"
+        f"<button class='tab-btn' data-tab='screenplay' onclick=\"showTab('screenplay',this)\">📝 2. Screenplay</button>"
+        f"<button class='tab-btn' data-tab='storyboard' onclick=\"showTab('storyboard',this)\">{st_by_id['storyboard']} 3. Storyboard</button>"
+        f"<button class='tab-btn' data-tab='dailies' onclick=\"showTab('dailies',this)\">{st_by_id['dailies']} 4. Dailies (Video)</button>"
+        f"<button class='tab-btn' data-tab='cuts' onclick=\"showTab('cuts',this)\">{st_by_id['master']} 5. Cuts & Masters</button>"
         "</div>"
     )
     body = (
-        f"<div id='pane-script' class='tab-pane'>{render_script_section(bd, cs_map, notes)}</div>"
-        f"<div id='pane-screenplay' class='tab-pane' style='display:none'>{render_screenplay_section(sp_txt, sls)}</div>"
-        f"<div id='pane-storyboard' class='tab-pane' style='display:none'>{render_storyboard_section(sls, out_html, dailies_root=dailies_root, production_dir=production_dir, existing_notes=notes, embed=embed)}</div>"
-        f"<div id='pane-dailies' class='tab-pane' style='display:none'>{render_dailies_section(production_dir, episode, out_html, existing_notes=notes, embed=embed, embed_video=embed_video)}</div>"
-        f"<div id='pane-cuts' class='tab-pane' style='display:none'>{render_cuts_section(production_dir, episode, out_html, embed_video=embed_video)}</div>"
+        f"<div id='pane-overview' class='tab-pane'><div class='pane-section-label'>📊 Production Overview & Status</div>{render_overview_section(state, out_html, embed=embed)}</div>"
+        f"<div id='pane-script' class='tab-pane' style='display:none'><div class='pane-section-label'>📜 1. Script Breakdown</div>{render_script_section(bd, cs_map, notes)}</div>"
+        f"<div id='pane-screenplay' class='tab-pane' style='display:none'><div class='pane-section-label'>📝 2. Screenplay & Subtext</div>{render_screenplay_section(sp_txt, sls)}</div>"
+        f"<div id='pane-storyboard' class='tab-pane' style='display:none'><div class='pane-section-label'>🎬 3. Storyboard & Prompts</div>{render_storyboard_section(sls, out_html, dailies_root=dailies_root, production_dir=production_dir, existing_notes=notes, embed=embed)}</div>"
+        f"<div id='pane-dailies' class='tab-pane' style='display:none'><div class='pane-section-label'>🎥 4. Dailies Screening Room</div>{render_dailies_section(production_dir, episode, out_html, existing_notes=notes, embed=embed, embed_video=embed_video)}</div>"
+        f"<div id='pane-cuts' class='tab-pane' style='display:none'><div class='pane-section-label'>🏆 5. Cuts & Delivered Masters</div>{render_cuts_section(production_dir, episode, out_html, embed_video=embed_video)}</div>"
     )
     show_json = os.path.join(production_dir, "show.json")
     show_title = json.load(open(show_json, encoding="utf-8")).get("title", "AI Studio Crew") if os.path.exists(show_json) else "AI Studio Crew"
-    html = _wrap_page(f"{show_title} · {episode} Studio Hub", production_dir, body, tabs_html=tabs, initial_notes=notes)
+    subtitle = f"{episode} · Updated {time.strftime('%F %H:%M:%S')} · Single-page Studio Command Center"
+    html = _wrap_page(f"{show_title} — Studio Hub", subtitle, body, tabs_html=tabs, progress_pct=state["overall_pct"], initial_notes=notes)
     os.makedirs(os.path.dirname(os.path.abspath(out_html)), exist_ok=True)
     with open(out_html, "w", encoding="utf-8") as f:
         f.write(html)
+    # Also maintain EPxx_studio_hub.html alias if writing default studio_hub.html
+    ep_alias = os.path.join(production_dir, f"{episode}_studio_hub.html")
+    if os.path.abspath(out_html) != os.path.abspath(ep_alias) and os.path.dirname(os.path.abspath(out_html)) == os.path.abspath(production_dir):
+        with open(ep_alias, "w", encoding="utf-8") as f:
+            f.write(html)
     return out_html
 
 
+def refresh_hub(production_dir="production", episode="EP01", script_path=None):
+    """Best-effort helper called by pipeline scripts so production/studio_hub.html stays live after every step."""
+    try:
+        if os.path.isdir(production_dir):
+            return build_hub(production_dir, episode=episode, script_path=script_path)
+    except Exception:
+        pass
+    return None
+
+
 def serve_hub(production_dir, episode="EP01", script_path=None, port=8765):
-    """Serve Studio Hub on 127.0.0.1 with POST /api/notes writing directly to director_notes.json."""
     prod_abs = os.path.abspath(production_dir)
     hub_path = build_hub(prod_abs, episode=episode, script_path=script_path)
 
@@ -646,7 +977,7 @@ def serve_hub(production_dir, episode="EP01", script_path=None, port=8765):
             super().__init__(*args, directory=prod_abs, **kwargs)
 
         def do_GET(self):
-            if self.path in ("/", "/index.html"):
+            if self.path in ("/", "/index.html", "/studio_hub.html"):
                 build_hub(prod_abs, episode=episode, script_path=script_path, out_html=hub_path)
                 self.path = "/" + os.path.relpath(hub_path, prod_abs)
             return super().do_GET()

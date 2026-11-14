@@ -30,6 +30,13 @@ def main():
     with open(os.path.join(a.dir, "bible/style/look.md"), "a") as f:
         if os.path.getsize(f.name) == 0:
             f.write(f"# Look — {a.title}\n\nStyle line: {a.style}\n\n(Colorist/DOP: lock palette, lens feel, lighting here.)\n")
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import studio_board
+        studio_board.refresh_hub(a.dir)
+    except Exception:
+        pass
     print(f"production ready at {a.dir}")
 
 if __name__ == "__main__":

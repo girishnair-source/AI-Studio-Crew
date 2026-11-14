@@ -84,6 +84,15 @@ def main():
         print(json.dumps(entry))
     with open(os.path.join(a.out_dir, f"{a.show}_{a.ep}_manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
+    try:
+        import sys
+        proto_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "studio-protocol", "scripts"))
+        if proto_dir not in sys.path:
+            sys.path.insert(0, proto_dir)
+        import studio_board
+        studio_board.refresh_hub(os.path.dirname(os.path.abspath(a.out_dir.rstrip("/"))), episode=a.ep)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

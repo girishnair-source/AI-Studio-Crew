@@ -401,6 +401,16 @@ def main():
             json.dump(otio, f, indent=1)
     with open(a.out + ".changes.json", "w") as f:
         json.dump({"re_rendered": changes, "reused": len(parts) - len(changes), "warnings": warnings}, f, indent=1)
+    try:
+        import sys
+        proto_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "studio-protocol", "scripts"))
+        if proto_dir not in sys.path:
+            sys.path.insert(0, proto_dir)
+        import studio_board
+        prod_dir = os.path.dirname(os.path.dirname(os.path.abspath(a.out)))
+        studio_board.refresh_hub(prod_dir)
+    except Exception:
+        pass
     print(json.dumps({"out": a.out, "duration": round(total, 2), "clips": len(edl), "re_rendered": len(changes), "reused": len(parts) - len(changes), "warnings": warnings}))
 
 

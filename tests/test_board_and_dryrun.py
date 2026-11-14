@@ -74,6 +74,11 @@ class TestBoardAndDryRun(unittest.TestCase):
                 self.assertTrue(os.path.exists(path))
                 with open(path, encoding="utf-8") as f:
                     self.assertIn(needle, f.read())
+            with open(hub_html, encoding="utf-8") as f:
+                hub_txt = f.read()
+            self.assertIn("% Complete", hub_txt)
+            self.assertIn("Scene Production Tracker", hub_txt)
+            self.assertIn("Show All on One Page", hub_txt)
 
 
 if __name__ == "__main__":

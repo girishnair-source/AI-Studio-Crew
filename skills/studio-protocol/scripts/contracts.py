@@ -226,6 +226,7 @@ def main():
             sys.path.insert(0, HERE); import studio_board
             sb_out = os.path.splitext(a.shotlist)[0] + "_storyboard.html"
             studio_board.build_storyboard_board([a.shotlist], sb_out, dailies_root=dd)
+            studio_board.refresh_hub(os.path.dirname(os.path.abspath(a.bible.rstrip('/'))))
         except Exception:
             pass
         print(f"manifest: {a.out} ({len(man)} shots) → dailies {dd}")
